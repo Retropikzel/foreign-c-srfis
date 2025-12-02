@@ -1,0 +1,54 @@
+.SILENT: build install test test-docker clean
+.PHONY: test-r6rs test-r7rs
+SCHEME=chibi
+SRFI=170
+AUTHOR=Retropikzel
+
+SRFI_FILE=srfi/${SRFI}.sld
+VERSION=$(shell cat srfi/${SRFI}/VERSION)
+DESCRIPTION=$(shell head -n1 srfi/${SRFI}/README.md)
+README=srfi/${SRFI}/README.html
+TESTFILE=srfi/${SRFI}/test.scm
+
+PKG=srfi-${SRFI}-${VERSION}.tgz
+
+DOCKERIMG=${SCHEME}:head
+ifeq "${SCHEME}" "chicken"
+DOCKERIMG="chicken:5"
+endif
+
+all: build
+
+build: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
+	echo "<pre>$$(cat srfi/${SRFI}/README.md)</pre>" > ${README}
+	snow-chibi package --version=${VERSION} --authors=${AUTHOR} --doc=${README} --description="${DESCRIPTION}" ${SRFI_FILE}
+
+install:
+	snow-chibi install --impls=${SCHEME} ${SNOW_CHIBI_ARGS} ${PKG}
+
+uninstall:
+	-snow-chibi remove --impls=${SCHEME} ${PKG}
+
+test-r7rs:
+	echo "(import (scheme base) (scheme write) (scheme file) (scheme process-context) (srfi ${SRFI}) (srfi 64))" > test-r7rs.scm
+	cat srfi/${SRFI}/test.scm >> test-r7rs.scm
+	COMPILE_R7RS=${SCHEME} compile-scheme -I . -o test-r7rs test-r7rs.scm
+	printf "\n" | ./test-r7rs
+
+test-r7rs-docker:
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
+	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} SNOW_CHIBI_ARGS=--always-yes build install test-r7rs"
+
+test-r6rs:
+	echo "(import (rnrs) (srfi ${SRFI}) (srfi :64))" > test-r6rs.sps
+	cat srfi/${SRFI}/test.scm >> test-r6rs.sps
+	akku install chez-srfi akku-r7rs "(foreign c)"
+	COMPILE_R7RS=${SCHEME} compile-scheme -I .akku/lib -o test-r6rs test-r6rs.sps
+	./test-r6rs
+
+test-r6rs-docker:
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
+	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} test-r6rs"
+
+clean:
+	git clean -X -f
