@@ -10,6 +10,7 @@ RUN wget https://gitlab.com/-/project/6808260/uploads/094ce726ce3c6cf8c14560f1e3
     && mv akku-1.1.0.amd64-linux akku
 RUN git clone https://github.com/ashinn/chibi-scheme.git --depth=1
 RUN git clone https://codeberg.org/retropikzel/compile-scheme.git --depth=1
+RUN git clone https://codeberg.org/retropikzel/foreign-c-libraries.git --depth=1
 WORKDIR /build/chibi-scheme
 RUN make
 RUN make install
@@ -36,10 +37,12 @@ RUN bash install.sh
 ENV PATH=/root/.local/bin:${PATH}
 RUN akku update
 WORKDIR /build/foreign-c
-RUN if [ ! "${SCHEME}" = "racket" ]; then timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(srfi 64)"; fi
-RUN if [ ! "${SCHEME}" = "larceny" ]; then timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(foreign c)"; fi
+RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(srfi 64)" || true
+RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(foreign c)" || true
+RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel shell)" || true
 RUN make SCHEME=${SCHEME} build install
 WORKDIR /workdir
+RUN cp -r /build/foreign-c-libraries/retropikzel retropikzel/
 RUN cp -r /build/foreign-c/foreign .
 COPY Makefile .
 COPY srfi srfi/

@@ -1,5 +1,5 @@
 Implementation of [SRFI 170](https://srfi.schemers.org/srfi-170/srfi-170.html)
-POSIX API using [(foreign c)](https://git.sr.ht/~retropikzel/foreign-c).
+POSIX API using (foreign c)].
 
 Currently only supports Linux.
 
