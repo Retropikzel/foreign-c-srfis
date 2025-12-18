@@ -10,7 +10,7 @@ VERSION=$(shell cat srfi/${SRFI}/VERSION)
 DESCRIPTION=$(shell head -n1 srfi/${SRFI}/README.md)
 README=srfi/${SRFI}/README.html
 TESTFILE=srfi/${SRFI}/test.scm
-TMPDIR=./tmp/${SCHEME}
+TMPDIR=.tmp/${SCHEME}
 
 PKG=srfi-${SRFI}-${VERSION}.tgz
 
@@ -39,7 +39,7 @@ test-r7rs: tmpdir
 	cd ${TMPDIR} && printf "\n" | ./test-r7rs
 
 test-r7rs-docker:
-	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} --quiet .
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
 	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} SNOW_CHIBI_ARGS=--always-yes build install test-r7rs"
 
 test-r6rs: tmpdir
@@ -50,7 +50,7 @@ test-r6rs: tmpdir
 	cd ${TMPDIR} && ./test-r6rs
 
 test-r6rs-docker:
-	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} --quiet .
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
 	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} test-r6rs"
 
 tmpdir:
