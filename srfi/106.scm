@@ -129,23 +129,33 @@
                               (c-type-size 'int))
       (c-bytevector-sint-set! pollfd
                               0
-                              0 ;POLLOUT & POLLIN
+                              0
                               (native-endianness)
                               (c-type-size 'int))
       ;; TODO Why 8 works but 1 does not?
       (when (= (c-poll pollfd 8 5000) 0)
         (error "Connection timed out")))
-
-
-    (let ((msg (string->c-utf8 "Hello"))
-          (msg-len 5))
-      (display "HERE:")
-      (when (= (c-send socket-file-descriptor msg msg-len 0) -1)
-        (c-perror (string->c-utf8 "Sending erorr"))
-        (exit 1)
-        )
-      )
-
     (make-socket socket-file-descriptor)))
+
+(define message-type
+  (lambda names
+    (if (null? names)
+      #f
+      (map
+        (lambda (name)
+          (cond ((equal? name 'none) #f)
+                ((equal? name 'peek) *msg-peek*)
+                ((equal? name 'oob) *msg-oob*)
+                ((equal? name 'wait-all) *msg-waitall*)))
+        names))))
+
+(define (socket-send socket bv . flags)
+  (let* ((msg (bytevector->c-bytevector bv))
+         (msg-len (bytevector-length bv))
+         (sent-count (c-send (socket-file-descriptor socket) msg msg-len 0)))
+    (when (= sent-count -1)
+      (c-perror (string->c-utf8 "Sending erorr"))
+      (exit 1))
+    sent-count))
 
 
