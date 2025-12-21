@@ -23,9 +23,10 @@
           ;shutdown-method
           socket-merge-flags
           socket-purge-flags
-          *af-unspec*
           *af-inet*
           *af-inet6*
+          *af-unix*
+          *af-unspec*
           *sock-stream*
           *sock-dgram*
           *ai-canonname*
