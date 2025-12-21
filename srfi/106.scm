@@ -108,12 +108,13 @@
                                    (c-type-size 'int)))))
     (when (< addrinfo-result 0)
       (c-perror (string->c-utf8 "make-client-socket (addrinfo) error"))
-      (exit 1))
+      (raise-continuable "make-client-socket (addrinfo) error"))
     (when (< socket-file-descriptor 0)
       (c-perror (string->c-utf8 "make-client-socket error"))
-      (exit 1))
+      (raise-continuable "make-client-socket (socket) error"))
     (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
-      (c-perror (string->c-utf8 "make-client-socket (fcntl) error")))
+      (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
+      (raise-continuable "make-client-socket (fcntl) error"))
     (letrec* ((connect-result
                 (c-connect socket-file-descriptor
                            ;; ai-addr
@@ -154,14 +155,14 @@
     (sockaddr-size (+ ai-family-size (bytevector-length (string->utf8 node)))))
     (when (< socket-file-descriptor 0)
       (c-perror (string->c-utf8 "make-client-socket error"))
-      (exit 1))
+      (raise-continuable "make-client-socket (socket) error"))
     (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
       (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
-      (exit 1))
+      (raise-continuable "make-client-socket (fcntl) error"))
     (let ((connect-result (c-connect socket-file-descriptor sockaddr sockaddr-size)))
       (when (< connect-result 0)
-        (c-perror (string->c-utf8 "make-client-socket error"))
-        (exit 1))
+        (c-perror (string->c-utf8 "make-client-socket (connect) error"))
+        (raise-continuable "make-client-socket (connect) error"))
       (make-socket socket-file-descriptor))))
 
 (define (make-client-socket node service . args)
@@ -196,7 +197,21 @@
          (sent-count (c-send (socket-file-descriptor socket) msg msg-len 0)))
     (when (= sent-count -1)
       (c-perror (string->c-utf8 "socket-send error"))
-      (exit 1))
+      (raise-continuable "socket-send error"))
     sent-count))
 
+(define (socket-recv-loop socket bytes-pointer size)
+  (let ((read-result (c-read (socket-file-descriptor socket)
+                             bytes-pointer
+                             size)))
+    (cond ((< read-result 1) (socket-recv-loop socket bytes-pointer size))
+          (else
+            (c-bytevector->bytevector bytes-pointer size)))))
 
+(define (socket-recv socket size . flags)
+  ;; TODO FIXME If connection is closed return empty bytevector
+  (let* ((msg-type (if (null? flags)
+                     (message-type 'none)
+                     (apply message-type flags)))
+         (bytes-pointer (make-c-bytevector size 0)))
+    (socket-recv-loop socket bytes-pointer size)))

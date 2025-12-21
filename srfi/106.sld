@@ -6,10 +6,10 @@
           (foreign c))
   (export make-client-socket
           ;make-server-socket
-          ;socket?
+          socket?
           ;socket-accept
           socket-send
-          ;socket-recv
+          socket-recv
           ;socket-shutdown
           ;socket-close
           ;socket-input-port
