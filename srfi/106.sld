@@ -11,7 +11,7 @@
           socket-send
           socket-recv
           ;socket-shutdown
-          ;socket-close
+          socket-close
           ;socket-input-port
           ;socket-output-port
           ;call-with-socket

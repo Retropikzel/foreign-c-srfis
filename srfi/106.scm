@@ -20,6 +20,7 @@
 (define-c-procedure c-read libc 'read 'int '(int pointer int))
 (define-c-procedure c-poll libc 'poll 'int '(pointer int int))
 (define-c-procedure c-strcpy libc 'strcpy 'int '(pointer pointer))
+(define-c-procedure c-close libc 'close 'int '(int))
 
 
 (define-record-type <socket>
@@ -215,3 +216,10 @@
                      (apply message-type flags)))
          (bytes-pointer (make-c-bytevector size 0)))
     (socket-recv-loop socket bytes-pointer size)))
+
+(define (socket-close socket)
+  (when (not (socket? socket))
+    (error "socket-close: Not a socket" socket))
+  (c-close (socket-file-descriptor socket)))
+
+
