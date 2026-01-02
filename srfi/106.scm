@@ -26,6 +26,7 @@
 (define-c-procedure c-poll libc 'poll 'int '(pointer int int))
 (define-c-procedure c-strcpy libc 'strcpy 'int '(pointer pointer))
 (define-c-procedure c-close libc 'close 'int '(int))
+(define-c-procedure c-shutdown libc 'shutdown 'int '(int int))
 
 
 (define-record-type <socket>
@@ -320,3 +321,58 @@
       (c-perror (string->c-utf8 "socket-accept (accept) error"))
       (raise-continuable "socket-accept (accept) error"))
     (make-socket accepted-socket)))
+
+(define (call-with-socket socket thunk)
+  (let ((result (apply thunk (list socket))))
+    (socket-close socket)
+    result))
+
+(define (socket-shutdown socket how)
+  (c-shutdown (socket-file-descriptor socket) how))
+
+(define-syntax address-family
+  (syntax-rules ()
+    ((_ name)
+     (cond ((symbol=? 'name 'inet) *af-inet*)
+           ((symbol=? 'name 'inet6) *af-inet6*)
+           ((symbol=? 'name 'unspec) *af-unspec*)
+           ((symbol=? 'name 'unix) *af-unix*)
+           (else (error "address-family: Unrecognized name" name))))))
+
+(define-syntax address-info
+  (syntax-rules ()
+    ((_ names ...)
+     (apply socket-merge-flags
+            (map (lambda (name)
+                   (cond ((symbol=? name 'canoname) *ai-canoname*)
+                         ((symbol=? name 'numerichost) *ai-numerichost*)
+                         ((symbol=? name 'v4mapped) *ai-v4mapped*)
+                         ((symbol=? name 'all) *ai-all*)
+                         ((symbol=? name 'addrconfig) *ai-addrconfig*)
+                         (else (error "address-info: Unrecognized name" name))))
+                 '(names ...))))))
+
+(define-syntax socket-domain
+  (syntax-rules ()
+    ((_ name)
+     (cond ((symbol=? 'name 'stream) *sock-stream*)
+           ((symbol=? 'name 'datagram) *af-unix*)
+           (else (error "socket-domain: Unrecognized name" name))))))
+
+(define-syntax ip-protocol
+  (syntax-rules ()
+    ((_ name)
+     (cond ((symbol=? 'name 'ip) *ipproto-ip*)
+           ((symbol=? 'name 'tcp) *ipproto-tcp*)
+           ((symbol=? 'name 'udp) *ipproto-udp*)
+           (else (error "ip-protocol: Unrecognized name" name))))))
+
+(define-syntax shutdown-method
+  (syntax-rules ()
+    ((_ names ...)
+     (cond ((and (member 'read '(names ...))
+                 (member 'write '(names ...)))
+            *shut-rdwr*)
+           ((symbol=? (member 'read '(names ...)) 'read) *shut-rd*)
+           ((symbol=? (member 'write '(names ...)) 'write) *shut-wr*)
+           (else (error "shutdown-method: Names must be either read, write or both"))))))

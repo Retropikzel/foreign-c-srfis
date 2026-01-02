@@ -10,17 +10,17 @@
           socket-accept
           socket-send
           socket-recv
-          ;socket-shutdown
+          socket-shutdown
           socket-close
           ;socket-input-port
           ;socket-output-port
-          ;call-with-socket
-          ;address-family
-          ;address-info
-          ;socket-domain
-          ;ip-protocol
-          ;message-type
-          ;shutdown-method
+          call-with-socket
+          address-family
+          address-info
+          socket-domain
+          ip-protocol
+          message-type
+          shutdown-method
           socket-merge-flags
           socket-purge-flags
           *af-inet*

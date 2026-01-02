@@ -1,1 +1,7 @@
 SRFI-106: Basic socket interface
+
+
+Not implemented yet:
+
+- socket-input-port
+- socket-output-port

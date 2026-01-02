@@ -1,4 +1,21 @@
 
+
+(display "HERE address-family: ")
+(write (address-family inet))
+(newline)
+
+(display "HERE address-info: ")
+(write (address-info v4mapped addrconfig))
+(newline)
+
+(display "HERE socket-domain:")
+(write (socket-domain stream))
+(newline)
+
+(display "HERE ip-protocol: ")
+(write (ip-protocol ip))
+(newline)
+
 (define-c-library libc `("stdlib.h") libc-name '((additional-versions ("0" "6"))))
 (define-c-procedure c-system libc 'system 'int '(pointer))
 
