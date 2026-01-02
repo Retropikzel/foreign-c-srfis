@@ -45,7 +45,7 @@ test-r7rs-docker:
 test-r6rs: tmpdir
 	cd ${TMPDIR} && echo "(import (rnrs) (foreign c) (srfi :${SRFI}) (srfi :64))" > test-r6rs.sps
 	cd ${TMPDIR} && cat srfi/${SRFI}/test.scm >> test-r6rs.sps
-	cd ${TMPDIR} && akku install chez-srfi akku-r7rs "(foreign c)" #"(retropikzel shell)"
+	cd ${TMPDIR} && akku install chez-srfi akku-r7rs #"(foreign c)" "(retropikzel shell)"
 	cd ${TMPDIR} && COMPILE_R7RS=${SCHEME} compile-scheme -I .akku/lib -o test-r6rs test-r6rs.sps
 	cd ${TMPDIR} && ./test-r6rs
 
@@ -57,6 +57,4 @@ tmpdir:
 	rm -rf ${TMPDIR}
 	mkdir -p ${TMPDIR}
 	cp -r srfi ${TMPDIR}/
-
-clean:
-	git clean -X -f
+	cp -r foreign ${TMPDIR}/

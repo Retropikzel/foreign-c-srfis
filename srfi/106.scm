@@ -72,8 +72,8 @@
 (define SO-REUSEPORT 15)
 (define AI-PASSIVE 1)
 
-(define +sockaddr-size+ 16)
-(define +ai-family-size+ 2)
+(define *sockaddr-size* 16)
+(define *ai-family-size* 2)
 
 (define socket-merge-flags (lambda flags (apply + flags)))
 (define (socket-purge-flags base-flag . flags) (apply - (cons base-flag flags)))
@@ -134,11 +134,11 @@
            (let* ((pointer (make-c-bytevector 128 0))
                   (pointer-address (c-bytevector->address pointer))
                   (node-pointer (address->c-bytevector
-                                  (+ pointer-address +ai-family-size+))))
+                                  (+ pointer-address *ai-family-size*))))
              (c-bytevector-set! pointer 'u16 0 *af-unix*)
              (c-strcpy node-pointer (string->c-utf8 node))
              pointer))
-         (sockaddr-size (+ +ai-family-size+ (bytevector-length (string->utf8 node)))))
+         (sockaddr-size (+ *ai-family-size* (bytevector-length (string->utf8 node)))))
     (when (< socket-file-descriptor 0)
       (c-perror (string->c-utf8 "make-client-socket (socket) error"))
       (raise-continuable "make-client-socket (socket) error"))
@@ -214,7 +214,7 @@
            (let* ((pointer (make-c-bytevector 128 0))
                   (pointer-address (c-bytevector->address pointer))
                   (node-pointer (address->c-bytevector
-                                  (+ pointer-address +ai-family-size+))))
+                                  (+ pointer-address *ai-family-size*))))
              (c-bytevector-set! pointer 'u16 0 *af-inet*)
              (c-bytevector-set! pointer
                                 'u16
@@ -226,7 +226,7 @@
          (option (let ((pointer (make-c-bytevector (c-type-size 'int))))
                    (c-bytevector-set! pointer 'int 0 1)
                    pointer))
-         (sockaddr-size (+ +ai-family-size+ (bytevector-length (string->utf8 node)))))
+         (sockaddr-size (+ *ai-family-size* (bytevector-length (string->utf8 node)))))
     (when (< socket-file-descriptor 0)
       (c-perror (string->c-utf8 "make-server-socket (socket) error"))
       (raise-continuable "make-server-socket (socket) error"))
@@ -236,7 +236,7 @@
     (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEPORT option (c-type-size 'int)) 0)
       (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEPORT) error"))
       (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
-    (when (< (c-bind socket-file-descriptor sockaddr +sockaddr-size+) 0)
+    (when (< (c-bind socket-file-descriptor sockaddr *sockaddr-size*) 0)
       (c-perror (string->c-utf8 "socket-accept (bind) error"))
       (raise-continuable "socket-accept (bind) error"))
     (when (< (c-listen socket-file-descriptor 0) 0)
@@ -337,19 +337,19 @@
            ((symbol=? 'name 'inet6) *af-inet6*)
            ((symbol=? 'name 'unspec) *af-unspec*)
            ((symbol=? 'name 'unix) *af-unix*)
-           (else (error "address-family: Unrecognized name" name))))))
+           (else (error "address-family: Unrecognized name" 'name))))))
 
 (define-syntax address-info
   (syntax-rules ()
     ((_ names ...)
      (apply socket-merge-flags
             (map (lambda (name)
-                   (cond ((symbol=? name 'canoname) *ai-canoname*)
+                   (cond ((symbol=? name 'canonname) *ai-canonname*)
                          ((symbol=? name 'numerichost) *ai-numerichost*)
                          ((symbol=? name 'v4mapped) *ai-v4mapped*)
                          ((symbol=? name 'all) *ai-all*)
                          ((symbol=? name 'addrconfig) *ai-addrconfig*)
-                         (else (error "address-info: Unrecognized name" name))))
+                         (else (error "address-info: Unrecognized name" 'name))))
                  '(names ...))))))
 
 (define-syntax socket-domain
@@ -357,7 +357,7 @@
     ((_ name)
      (cond ((symbol=? 'name 'stream) *sock-stream*)
            ((symbol=? 'name 'datagram) *af-unix*)
-           (else (error "socket-domain: Unrecognized name" name))))))
+           (else (error "socket-domain: Unrecognized name" 'name))))))
 
 (define-syntax ip-protocol
   (syntax-rules ()
@@ -365,7 +365,7 @@
      (cond ((symbol=? 'name 'ip) *ipproto-ip*)
            ((symbol=? 'name 'tcp) *ipproto-tcp*)
            ((symbol=? 'name 'udp) *ipproto-udp*)
-           (else (error "ip-protocol: Unrecognized name" name))))))
+           (else (error "ip-protocol: Unrecognized name" 'name))))))
 
 (define-syntax shutdown-method
   (syntax-rules ()

@@ -22,7 +22,8 @@ RUN git clone https://codeberg.org/foreign-c/foreign-c.git --depth=2
 ARG SCHEME=chibi
 ARG IMAGE=${SCHEME}:head
 FROM schemers/${IMAGE}
-RUN apt-get update && apt-get install -y make gcc libffi-dev libcurl4 gauche
+RUN apt-get update && apt-get install -y make gcc libffi-dev libcurl4 gauche \
+    netcat-traditional ca-certificates curl
 RUN mkdir ${HOME}/.snow && echo "()" > ${HOME}/.snow/config.scm
 COPY --from=build /build /build
 ARG SCHEME=chibi
@@ -46,4 +47,4 @@ RUN cp -r /build/foreign-c-libraries/retropikzel retropikzel/
 RUN cp -r /build/foreign-c/foreign .
 COPY Makefile .
 COPY srfi srfi/
-
+COPY foreign foreign/
