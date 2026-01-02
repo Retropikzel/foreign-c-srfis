@@ -5,9 +5,9 @@
           (scheme process-context)
           (foreign c))
   (export make-client-socket
-          ;make-server-socket
+          make-server-socket
           socket?
-          ;socket-accept
+          socket-accept
           socket-send
           socket-recv
           ;socket-shutdown
