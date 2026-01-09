@@ -41,6 +41,7 @@ WORKDIR /build/foreign-c
 RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(srfi 64)" || true
 RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(foreign c)" || true
 RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel shell)" || true
+RUN timeout 30 snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel debug)" || true
 RUN make SCHEME=${SCHEME} build install
 WORKDIR /workdir
 RUN cp -r /build/foreign-c-libraries/retropikzel retropikzel/

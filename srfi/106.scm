@@ -132,8 +132,8 @@
   (let* ((socket-file-descriptor (c-socket ai-family ai-socktype 0))
          (sockaddr
            (let* ((pointer (make-c-bytevector 128 0))
-                  (pointer-address (c-bytevector->address pointer))
-                  (node-pointer (address->c-bytevector
+                  (pointer-address (c-bytevector->integer pointer))
+                  (node-pointer (integer->c-bytevector
                                   (+ pointer-address *ai-family-size*))))
              (c-bytevector-set! pointer 'u16 0 *af-unix*)
              (c-strcpy node-pointer (string->c-utf8 node))
@@ -212,8 +212,8 @@
          (node "127.0.0.1")
          (sockaddr
            (let* ((pointer (make-c-bytevector 128 0))
-                  (pointer-address (c-bytevector->address pointer))
-                  (node-pointer (address->c-bytevector
+                  (pointer-address (c-bytevector->integer pointer))
+                  (node-pointer (integer->c-bytevector
                                   (+ pointer-address *ai-family-size*))))
              (c-bytevector-set! pointer 'u16 0 *af-inet*)
              (c-bytevector-set! pointer
