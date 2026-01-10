@@ -38,38 +38,3 @@
 
 (debug (utf8->string (socket-recv client-sock1 3)))
 
-
-(display "Testing UNIX socket")
-(newline)
-
-(debug (address-family unix))
-(debug (address-info v4mapped addrconfig))
-(debug (socket-domain stream))
-(debug (ip-protocol ip))
-
-(define sock-path "/tmp/demo.sock")
-(c-system (string->c-utf8 (string-append "echo \"lol\" | nc -l -U " sock-path " &")))
-
-(define usock1 (make-client-socket sock-path "3000" *af-unix*))
-
-(debug usock1)
-(debug (utf8->string (socket-recv usock1 3)))
-
-(socket-send usock1 (string->utf8 "Hello from usock1\n"))
-
-(socket-close usock1)
-
-
-(define usock2-port "")
-(define usock2 (make-server-socket usock2-port *af-unix*))
-(debug usock2)
-
-(display (string-append "run: echo \"lol\" | nc " sock-path " " usock2-port))
-(newline)
-
-(define client-usock1 (socket-accept usock2))
-(debug client-usock1)
-
-(socket-send client-sock1 (string->utf8 "Hello from client-usock1\n"))
-
-(debug (utf8->string (socket-recv client-usock1 3)))

@@ -36,7 +36,6 @@
 
 (define *af-inet* 2)
 (define *af-inet6* 10)
-(define *af-unix* 1)
 (define *af-unspec* 0)
 
 (define *sock-stream* 1)
@@ -78,79 +77,6 @@
 (define socket-merge-flags (lambda flags (apply + flags)))
 (define (socket-purge-flags base-flag . flags) (apply - (cons base-flag flags)))
 
-(define (make-network-socket node service ai-family ai-socktype ai-flags ai-protocol)
-  (let* ((ai-family-offset (c-type-size 'int))
-         (ai-socktype-offset (* (c-type-size 'int) 2))
-         (ai-protocol-offset (* (c-type-size 'int) 3))
-         (addrinfo-hints
-           (let ((pointer (make-c-bytevector 128 0)))
-             (c-bytevector-set! pointer 'int ai-family-offset ai-family)
-             (c-bytevector-set! pointer 'int ai-socktype-offset ai-socktype)
-             pointer))
-         (addrinfo (make-c-bytevector 128 0))
-         (addrinfo-result
-           (call-with-address-of
-             addrinfo
-             (lambda (addrinfo-address)
-               (call-with-address-of
-                 addrinfo-hints
-                 (lambda (addrinfo-hints-address)
-                   (c-getaddrinfo (string->c-utf8 node)
-                                  (string->c-utf8 service)
-                                  addrinfo-hints
-                                  addrinfo-address))))))
-         (socket-file-descriptor
-           (c-socket
-             (c-bytevector-ref addrinfo 'int ai-family-offset)
-             (c-bytevector-ref addrinfo 'int ai-socktype-offset)
-             (c-bytevector-ref addrinfo 'int ai-protocol-offset))))
-    (when (< addrinfo-result 0)
-      (c-perror (string->c-utf8 "make-client-socket (addrinfo) error"))
-      (raise-continuable "make-client-socket (addrinfo) error"))
-    (when (< socket-file-descriptor 0)
-      (c-perror (string->c-utf8 "make-client-socket (socket) error"))
-      (raise-continuable "make-client-socket (socket) error"))
-    (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
-      (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
-      (raise-continuable "make-client-socket (fcntl) error"))
-    (letrec* ((ai-addr-offset (* (c-type-size 'int) 6))
-              (ai-addrlen-offset (* (c-type-size 'int) 4))
-              (connect-result
-                (c-connect socket-file-descriptor
-                           (c-bytevector-ref addrinfo 'pointer ai-addr-offset)
-                           (c-bytevector-ref addrinfo 'int ai-addrlen-offset)))
-              (pollfd (make-c-bytevector 128 0)))
-      (c-bytevector-set! pollfd 'uint 0 socket-file-descriptor)
-      (c-bytevector-set! pollfd 'int 0 0)
-      ;; FIXME No magic numbers, like 8 or 1 here. Put into variable with good name
-      ;; TODO Why 8 works but 1 does not?
-      (when (= (c-poll pollfd 8 5000) 0)
-        (error "make-client-socket (poll) error")))
-    (make-socket socket-file-descriptor)))
-
-(define (make-unix-socket node service ai-family ai-socktype ai-flags ai-protocol)
-  (let* ((socket-file-descriptor (c-socket ai-family ai-socktype 0))
-         (sockaddr
-           (let* ((pointer (make-c-bytevector 128 0))
-                  (pointer-address (c-bytevector->integer pointer))
-                  (node-pointer (integer->c-bytevector
-                                  (+ pointer-address *ai-family-size*))))
-             (c-bytevector-set! pointer 'u16 0 *af-unix*)
-             (c-strcpy node-pointer (string->c-utf8 node))
-             pointer))
-         (sockaddr-size (+ *ai-family-size* (bytevector-length (string->utf8 node)))))
-    (when (< socket-file-descriptor 0)
-      (c-perror (string->c-utf8 "make-client-socket (socket) error"))
-      (raise-continuable "make-client-socket (socket) error"))
-    (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
-      (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
-      (raise-continuable "make-client-socket (fcntl) error"))
-    (let ((connect-result (c-connect socket-file-descriptor sockaddr sockaddr-size)))
-      (when (< connect-result 0)
-        (c-perror (string->c-utf8 "make-client-socket (connect) error"))
-        (raise-continuable "make-client-socket (connect) error"))
-      (make-socket socket-file-descriptor))))
-
 (define (make-client-socket node service . args)
   (let* ((ai-family (if (>= (length args) 1) (list-ref args 0) *af-inet*))
          (ai-socktype (if (>= (length args) 2) (list-ref args 1) *sock-stream*))
@@ -161,9 +87,54 @@
            (if (>= (length args) 4)
              (list-ref args 3)
              *ipproto-ip*)))
-    (if (equal? ai-family *af-unix*)
-      (make-unix-socket node service ai-family ai-socktype ai-flags ai-protocol)
-      (make-network-socket node service ai-family ai-socktype ai-flags ai-protocol))))
+    (let* ((ai-family-offset (c-type-size 'int))
+           (ai-socktype-offset (* (c-type-size 'int) 2))
+           (ai-protocol-offset (* (c-type-size 'int) 3))
+           (addrinfo-hints
+             (let ((pointer (make-c-bytevector 128 0)))
+               (c-bytevector-set! pointer 'int ai-family-offset ai-family)
+               (c-bytevector-set! pointer 'int ai-socktype-offset ai-socktype)
+               pointer))
+           (addrinfo (make-c-bytevector 128 0))
+           (addrinfo-result
+             (call-with-address-of
+               addrinfo
+               (lambda (addrinfo-address)
+                 (call-with-address-of
+                   addrinfo-hints
+                   (lambda (addrinfo-hints-address)
+                     (c-getaddrinfo (string->c-utf8 node)
+                                    (string->c-utf8 service)
+                                    addrinfo-hints
+                                    addrinfo-address))))))
+           (socket-file-descriptor
+             (c-socket
+               (c-bytevector-ref addrinfo 'int ai-family-offset)
+               (c-bytevector-ref addrinfo 'int ai-socktype-offset)
+               (c-bytevector-ref addrinfo 'int ai-protocol-offset))))
+      (when (< addrinfo-result 0)
+        (c-perror (string->c-utf8 "make-client-socket (addrinfo) error"))
+        (raise-continuable "make-client-socket (addrinfo) error"))
+      (when (< socket-file-descriptor 0)
+        (c-perror (string->c-utf8 "make-client-socket (socket) error"))
+        (raise-continuable "make-client-socket (socket) error"))
+      (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
+        (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
+        (raise-continuable "make-client-socket (fcntl) error"))
+      (letrec* ((ai-addr-offset (* (c-type-size 'int) 6))
+                (ai-addrlen-offset (* (c-type-size 'int) 4))
+                (connect-result
+                  (c-connect socket-file-descriptor
+                             (c-bytevector-ref addrinfo 'pointer ai-addr-offset)
+                             (c-bytevector-ref addrinfo 'int ai-addrlen-offset)))
+                (pollfd (make-c-bytevector 128 0)))
+        (c-bytevector-set! pollfd 'uint 0 socket-file-descriptor)
+        (c-bytevector-set! pollfd 'int 0 0)
+        ;; FIXME No magic numbers, like 8 or 1 here. Put into variable with good name
+        ;; TODO Why 8 works but 1 does not?
+        (when (= (c-poll pollfd 8 5000) 0)
+          (error "make-client-socket (poll) error")))
+      (make-socket socket-file-descriptor))))
 
 (define message-type
   (lambda names
@@ -244,70 +215,64 @@
       (raise-continuable "make-server-socket (listen) error"))
     (make-socket socket-file-descriptor)))
 
-(define (make-network-server-socket service ai-family ai-socktype ai-protocol)
-  (let* ((ai-flags AI-PASSIVE)
-         (ai-flags-offset 0)
-         (ai-family-offset (c-type-size 'int))
-         (ai-socktype-offset (* (c-type-size 'int) 2))
-         (ai-protocol-offset (* (c-type-size 'int) 3))
-         (addrinfo-hints
-           (let ((pointer (make-c-bytevector 128 0)))
-             (c-bytevector-set! pointer 'int ai-flags-offset ai-flags)
-             (c-bytevector-set! pointer 'int ai-family-offset ai-family)
-             (c-bytevector-set! pointer 'int ai-socktype-offset ai-socktype)
-             pointer))
-         (addrinfo (make-c-bytevector 128 0))
-         (addrinfo-result
-           (call-with-address-of
-             addrinfo
-             (lambda (addrinfo-address)
-               (call-with-address-of
-                 addrinfo-hints
-                 (lambda (addrinfo-hints-address)
-                   (c-getaddrinfo (string->c-utf8 "0.0.0.0")
-                                  (string->c-utf8 service)
-                                  addrinfo-hints
-                                  addrinfo-address))))))
-         (socket-file-descriptor
-           (c-socket
-             (c-bytevector-ref addrinfo 'int ai-family-offset)
-             (c-bytevector-ref addrinfo 'int ai-socktype-offset)
-             (c-bytevector-ref addrinfo 'int ai-protocol-offset)))
-         (option (let ((pointer (make-c-bytevector (c-type-size 'int))))
-                   (c-bytevector-set! pointer 'int 0 1)
-                   pointer))
-         (ai-addr-offset (* (c-type-size 'int) 6))
-         (ai-addr (c-bytevector-ref addrinfo 'pointer ai-addr-offset))
-         (ai-addrlen-offset (* (c-type-size 'int) 4))
-         (ai-addr-len (c-bytevector-ref addrinfo 'int ai-addrlen-offset)))
-    (when (< addrinfo-result 0)
-      (c-perror (string->c-utf8 "make-server-socket (addrinfo) error"))
-      (raise-continuable "make-server-socket (addrinfo) error"))
-    (when (< socket-file-descriptor 0)
-      (c-perror (string->c-utf8 "make-server-socket (socket) error"))
-      (raise-continuable "make-server-socket (socket) error"))
-    (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEADDR option (c-type-size 'int)) 0)
-      (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEADDR) error"))
-      (raise-continuable "make-server-socket (setsockopt SO-REUSEADDR) error"))
-    (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEPORT option (c-type-size 'int)) 0)
-      (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEPORT) error"))
-      (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
-    (when (< (c-bind socket-file-descriptor ai-addr ai-addr-len) 0)
-      (c-perror (string->c-utf8 "make-server-socket (bind) error"))
-      (raise-continuable "make-servever-socket (bind) error"))
-    (when (< (c-listen socket-file-descriptor 5) 0)
-      (c-perror (string->c-utf8 "make-server-socket (listen) error"))
-      (raise-continuable "make-server-socket (listen) error"))
-    (make-socket socket-file-descriptor)))
-
 (define (make-server-socket service . args)
   (let* ((ai-family (if (>= (length args) 1) (list-ref args 0) *af-inet*))
          (ai-socktype (if (>= (length args) 2) (list-ref args 1) *sock-stream*))
          (ai-protocol (if (>= (length args) 3) (list-ref args 2) *ipproto-ip*)))
-    (if (equal? ai-family *af-unix*)
-      ;(make-unix-server-socket node service ai-family ai-socktype ai-protocol)
-      (error "Unix server sockets are WIP")
-      (make-network-server-socket service ai-family ai-socktype ai-protocol))))
+    (let* ((ai-flags AI-PASSIVE)
+           (ai-flags-offset 0)
+           (ai-family-offset (c-type-size 'int))
+           (ai-socktype-offset (* (c-type-size 'int) 2))
+           (ai-protocol-offset (* (c-type-size 'int) 3))
+           (addrinfo-hints
+             (let ((pointer (make-c-bytevector 128 0)))
+               (c-bytevector-set! pointer 'int ai-flags-offset ai-flags)
+               (c-bytevector-set! pointer 'int ai-family-offset ai-family)
+               (c-bytevector-set! pointer 'int ai-socktype-offset ai-socktype)
+               pointer))
+           (addrinfo (make-c-bytevector 128 0))
+           (addrinfo-result
+             (call-with-address-of
+               addrinfo
+               (lambda (addrinfo-address)
+                 (call-with-address-of
+                   addrinfo-hints
+                   (lambda (addrinfo-hints-address)
+                     (c-getaddrinfo (string->c-utf8 "0.0.0.0")
+                                    (string->c-utf8 service)
+                                    addrinfo-hints
+                                    addrinfo-address))))))
+           (socket-file-descriptor
+             (c-socket
+               (c-bytevector-ref addrinfo 'int ai-family-offset)
+               (c-bytevector-ref addrinfo 'int ai-socktype-offset)
+               (c-bytevector-ref addrinfo 'int ai-protocol-offset)))
+           (option (let ((pointer (make-c-bytevector (c-type-size 'int))))
+                     (c-bytevector-set! pointer 'int 0 1)
+                     pointer))
+           (ai-addr-offset (* (c-type-size 'int) 6))
+           (ai-addr (c-bytevector-ref addrinfo 'pointer ai-addr-offset))
+           (ai-addrlen-offset (* (c-type-size 'int) 4))
+           (ai-addr-len (c-bytevector-ref addrinfo 'int ai-addrlen-offset)))
+      (when (< addrinfo-result 0)
+        (c-perror (string->c-utf8 "make-server-socket (addrinfo) error"))
+        (raise-continuable "make-server-socket (addrinfo) error"))
+      (when (< socket-file-descriptor 0)
+        (c-perror (string->c-utf8 "make-server-socket (socket) error"))
+        (raise-continuable "make-server-socket (socket) error"))
+      (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEADDR option (c-type-size 'int)) 0)
+        (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEADDR) error"))
+        (raise-continuable "make-server-socket (setsockopt SO-REUSEADDR) error"))
+      (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEPORT option (c-type-size 'int)) 0)
+        (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEPORT) error"))
+        (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
+      (when (< (c-bind socket-file-descriptor ai-addr ai-addr-len) 0)
+        (c-perror (string->c-utf8 "make-server-socket (bind) error"))
+        (raise-continuable "make-servever-socket (bind) error"))
+      (when (< (c-listen socket-file-descriptor 5) 0)
+        (c-perror (string->c-utf8 "make-server-socket (listen) error"))
+        (raise-continuable "make-server-socket (listen) error"))
+      (make-socket socket-file-descriptor))))
 
 (define (socket-accept socket)
   (let* ((addrlen (let ((pointer (make-c-bytevector (c-type-size 'int))))

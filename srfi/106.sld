@@ -25,7 +25,6 @@
           socket-purge-flags
           *af-inet*
           *af-inet6*
-          *af-unix*
           *af-unspec*
           *sock-stream*
           *sock-dgram*
