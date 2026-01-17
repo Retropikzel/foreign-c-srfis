@@ -167,6 +167,8 @@
 
 (define (socket-recv socket size . flags)
   ;; TODO FIXME If connection is closed return empty bytevector
+  (when (not (integer? size))
+    (error "socket-recv error: size must be integer" size))
   (let* ((msg-type (if (null? flags)
                      (message-type 'none)
                      (apply message-type flags)))
@@ -268,7 +270,7 @@
         (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
       (when (< (c-bind socket-file-descriptor ai-addr ai-addr-len) 0)
         (c-perror (string->c-utf8 "make-server-socket (bind) error"))
-        (raise-continuable "make-servever-socket (bind) error"))
+        (raise-continuable "make-server-socket (bind) error"))
       (when (< (c-listen socket-file-descriptor 5) 0)
         (c-perror (string->c-utf8 "make-server-socket (listen) error"))
         (raise-continuable "make-server-socket (listen) error"))
