@@ -33,24 +33,24 @@ uninstall:
 
 test-r7rs: tmpdir
 	@if [ "${SCHEME}" = "chibi" ]; then rm -rf ${TMPDIR}/srfi/98.*; fi
-	cd ${TMPDIR} && echo "(import (scheme base) (scheme write) (scheme file) (scheme process-context) (retropikzel debug) (foreign c) (srfi ${SRFI}) (srfi 64))" > test-r7rs.scm
+	cd ${TMPDIR} && echo "(import (scheme base) (scheme write) (scheme file) (scheme process-context) (foreign c) (srfi ${SRFI}) (srfi 64))" > test-r7rs.scm
 	cd ${TMPDIR} && cat srfi/${SRFI}/test.scm >> test-r7rs.scm
 	cd ${TMPDIR} && COMPILE_R7RS=${SCHEME} compile-scheme -I . -o test-r7rs test-r7rs.scm
 	cd ${TMPDIR} && printf "\n" | ./test-r7rs
 
 test-r7rs-docker:
-	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} -f Dockerfile.test .
 	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} SNOW_CHIBI_ARGS=--always-yes build install test-r7rs"
 
 test-r6rs: tmpdir
-	cd ${TMPDIR} && echo "(import (rnrs) (retropikzel debug) (foreign c) (srfi :${SRFI}) (srfi :64))" > test-r6rs.sps
+	cd ${TMPDIR} && echo "(import (rnrs) (foreign c) (srfi :${SRFI}) (srfi :64))" > test-r6rs.sps
 	cd ${TMPDIR} && cat srfi/${SRFI}/test.scm >> test-r6rs.sps
 	cd ${TMPDIR} && akku install chez-srfi akku-r7rs #"(foreign c)" "(retropikzel shell)"
 	cd ${TMPDIR} && COMPILE_R7RS=${SCHEME} compile-scheme -I .akku/lib -o test-r6rs test-r6rs.sps
 	cd ${TMPDIR} && ./test-r6rs
 
 test-r6rs-docker:
-	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} .
+	docker build --build-arg IMAGE=${DOCKERIMG} --build-arg SCHEME=${SCHEME} --tag=foreign-c-srfi-test-${SCHEME} -f Dockerfile.test .
 	docker run -t foreign-c-srfi-test-${SCHEME} sh -c "make SCHEME=${SCHEME} SRFI=${SRFI} test-r6rs"
 
 tmpdir:
