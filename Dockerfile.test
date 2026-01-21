@@ -23,7 +23,7 @@ ARG SCHEME=chibi
 ARG IMAGE=${SCHEME}:head
 FROM schemers/${IMAGE}
 RUN apt-get update && apt-get install -y make gcc libffi-dev libcurl4 gauche \
-    netcat-traditional ca-certificates curl
+    netcat-openbsd ca-certificates curl
 RUN mkdir ${HOME}/.snow && echo "()" > ${HOME}/.snow/config.scm
 COPY --from=build /build /build
 ARG SCHEME=chibi
@@ -41,6 +41,8 @@ WORKDIR /build/foreign-c
 RUN snow-chibi install --impls=${SCHEME} --always-yes "(srfi 64)"
 RUN snow-chibi install --impls=${SCHEME} --always-yes "(foreign c)"
 RUN snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel shell)"
+RUN snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel debug)"
+RUN snow-chibi install --impls=${SCHEME} --always-yes --install-source-dir=. --install-library-dir=. "(foreign c)"
 RUN snow-chibi install --impls=${SCHEME} --always-yes "(retropikzel debug)"
 RUN make SCHEME=${SCHEME} build install
 WORKDIR /workdir
