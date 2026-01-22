@@ -176,11 +176,12 @@
   (letrec* ((looper (lambda (c index result)
                       (if (char=? c #\null)
                         (list->string (reverse result))
-                        (looper (c-bytevector-char-ref pointer
-                                                       (+ offset index))
+                        (looper (c-bytevector-ref pointer
+                                                  'char
+                                                  (+ offset index))
                                 (+ index 1)
                                 (cons c result))))))
-    (looper (c-bytevector-char-ref pointer offset) 1 (list))))
+    (looper (c-bytevector-ref pointer 'char offset) 1 (list))))
 
 ; struct dirent d_name offset on linux
 (define d-name-offset 19)
@@ -332,10 +333,10 @@
                  (+ count 1)
                  groups-pointer
                  (append result
-                         (list (c-bytevector-sint-ref groups-pointer
-                                                      (* (c-type-size 'int) count)
-                                                      (native-endianness)
-                                                      (c-type-size 'int)))))))
+                         (list (c-bytevector-ref groups-pointer
+                                                 'int
+                                                 (* (c-type-size 'int) count)
+                                                 ))))))
 
 (define (user-supplementary-gids)
   (let* ((group-count (c-getgroups 0 (make-c-null)))
@@ -357,26 +358,28 @@
   (let ((password-struct (if (number? uid/name)
                            (c-getpwuid uid/name)
                            (c-getpwnam (string->c-utf8 uid/name)))))
-    (make-user-info (c-utf8->string (c-bytevector-pointer-ref password-struct
-                                                              0))
-                    (c-bytevector-sint-ref password-struct
-                                           (* (c-type-size 'pointer) 2)
-                                           (native-endianness)
-                                           (c-type-size 'int))
-                    (c-bytevector-sint-ref password-struct
-                                           (+ (* (c-type-size 'pointer) 2)
-                                              (c-type-size 'int))
-                                           (native-endianness)
-                                           (c-type-size 'int))
-                    (c-utf8->string (c-bytevector-pointer-ref password-struct
-                                                              (+ (* (c-type-size 'pointer) 3)
-                                                                 (* (c-type-size 'int) 2))))
-                    (c-utf8->string (c-bytevector-pointer-ref password-struct
-                                                              (+ (* (c-type-size 'pointer) 4)
-                                                                 (* (c-type-size 'int) 2))))
-                    (c-utf8->string (c-bytevector-pointer-ref password-struct
-                                                              (+ (* (c-type-size 'pointer) 2)
-                                                                 (* (c-type-size 'int) 2)))))))
+    (make-user-info (c-utf8->string (c-bytevector-ref password-struct
+                                                      'pointer
+                                                      0))
+                    (c-bytevector-ref password-struct
+                                      'int
+                                      (* (c-type-size 'pointer) 2))
+                    (c-bytevector-ref password-struct
+                                      'int
+                                      (+ (* (c-type-size 'pointer) 2)
+                                         (c-type-size 'int)))
+                    (c-utf8->string (c-bytevector-ref password-struct
+                                                      'pointer
+                                                      (+ (* (c-type-size 'pointer) 3)
+                                                         (* (c-type-size 'int) 2))))
+                    (c-utf8->string (c-bytevector-ref password-struct
+                                                      'pointer
+                                                      (+ (* (c-type-size 'pointer) 4)
+                                                         (* (c-type-size 'int) 2))))
+                    (c-utf8->string (c-bytevector-ref password-struct
+                                                      'pointer
+                                                      (+ (* (c-type-size 'pointer) 2)
+                                                         (* (c-type-size 'int) 2)))))))
 
 
 (define-record-type <group-info>
@@ -390,11 +393,10 @@
                         (c-getgrgid gid/name)
                         (c-getgrnam (string->c-utf8 gid/name)))))
     (make-group-info
-      (c-utf8->string (c-bytevector-pointer-ref group-struct 0))
-      (c-bytevector-sint-ref group-struct
-                             (* (c-type-size 'pointer) 2)
-                             (native-endianness)
-                             (c-type-size 'int)))))
+      (c-utf8->string (c-bytevector-ref group-struct 'pointer 0))
+      (c-bytevector-ref group-struct
+                        'int
+                        (* (c-type-size 'pointer) 2)))))
 
 (define (set-environment-variable! name value)
   (c-setenv (string->c-utf8 name) (string->c-utf8 value) 1))
