@@ -9,8 +9,8 @@
                     "pwd.h"
                     "grp.h"
                     "fcntl.h")
-                  libc-name
-                  '((additional-versions ("0" "6"))))
+                  #f
+                  '())
 
 (define-c-procedure c-perror libc 'perror 'void '(pointer))
 (define-c-procedure c-mkdir libc 'mkdir 'int '(pointer int))
@@ -51,7 +51,7 @@
 
 (define (random-to max)
   (when (not randomized?)
-    (c-srand (c-time (make-c-null)))
+    (c-srand (c-time (c-bytevector-null)))
     (set! randomized? #t))
   (modulo (c-rand) max))
 
@@ -93,25 +93,25 @@
   (follow? file-info:follow?))
 
 (define (file-info-directory? file-info)
-  (let ((handle (c-open (string->c-utf8 (file-info:fname/port file-info)) 2)))
+  (let ((handle (c-open (string->c-bytevector (file-info:fname/port file-info)) 2)))
     (cond ((> handle 0) (c-close handle) #f)
           (else #t))))
 
 (define (file-info fname/port follow?)
   (when (port? fname/port)
     (error "file-info implementation does not support ports as arguments"))
-  (let* ((fname-pointer (string->c-utf8 fname/port))
+  (let* ((fname-pointer (string->c-bytevector fname/port))
          (stat-pointer (make-c-bytevector 256))
          (result (if follow?
                    (c-stat fname-pointer stat-pointer)
                    (c-lstat fname-pointer stat-pointer)))
          (error-message "file-info error")
-         (error-pointer (string->c-utf8 error-message)))
+         (error-pointer (string->c-bytevector error-message)))
     (when (< result 0)
       (c-perror error-pointer)
-      (c-free fname-pointer)
-      (c-free stat-pointer)
-      (c-free error-pointer)
+      (c-bytevector-free fname-pointer)
+      (c-bytevector-free stat-pointer)
+      (c-bytevector-free error-pointer)
       (error error-message fname/port))
     (make-file-info-record #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 0) (native-endianness))
                            #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 1) (native-endianness))
@@ -131,46 +131,46 @@
 
 (define create-directory
   (lambda (fname . permission-bits)
-    (let* ((fname-pointer (string->c-utf8 fname))
+    (let* ((fname-pointer (string->c-bytevector fname))
            (mode (if (null? permission-bits)
                    #o775
                    (string->number (string-append "#o"
                                                   (number->string (car permission-bits))))))
            (result (c-mkdir fname-pointer mode))
            (error-message "create-directory error")
-           (error-pointer (string->c-utf8 error-message)))
-      (c-free fname-pointer)
+           (error-pointer (string->c-bytevector error-message)))
+      (c-bytevector-free fname-pointer)
       (when (< result 0)
         (c-perror error-pointer)
-        (c-free error-pointer)
+        (c-bytevector-free error-pointer)
         (error error-message)))))
 
 (define (create-hard-link old-fname new-fname)
-  (c-link (string->c-utf8 old-fname)
-          (string->c-utf8 new-fname)))
+  (c-link (string->c-bytevector old-fname)
+          (string->c-bytevector new-fname)))
 
 (define (create-symlink old-fname new-fname)
-  (c-slink (string->c-utf8 old-fname)
-           (string->c-utf8 new-fname)))
+  (c-slink (string->c-bytevector old-fname)
+           (string->c-bytevector new-fname)))
 
 (define (rename-file old-fname new-fname)
-  (c-rename (string->c-utf8 old-fname) (string->c-utf8 new-fname)))
+  (c-rename (string->c-bytevector old-fname) (string->c-bytevector new-fname)))
 
 (define (delete-directory fname)
-  (let* ((fname-pointer (string->c-utf8 fname))
+  (let* ((fname-pointer (string->c-bytevector fname))
          (result (c-rmdir fname-pointer))
          (error-message "delete-directory error")
-         (error-pointer (string->c-utf8 error-message)))
-    (c-free fname-pointer)
+         (error-pointer (string->c-bytevector error-message)))
+    (c-bytevector-free fname-pointer)
     (when (< result 0)
       (c-perror error-pointer)
-      (c-free error-pointer)
+      (c-bytevector-free error-pointer)
       (error error-message))))
 
 (define (set-file-owner fname uid gid)
-  (let ((fname-pointer (string->c-utf8 fname)))
+  (let ((fname-pointer (string->c-bytevector fname)))
     (c-chown fname-pointer uid gid)
-    (c-free fname-pointer)))
+    (c-bytevector-free fname-pointer)))
 
 (define (pointer-string-read pointer offset)
   (letrec* ((looper (lambda (c index result)
@@ -189,13 +189,13 @@
 (define directory-files
   (lambda (dir . dotfiles?)
     (letrec* ((include-dotfiles? (if (null? dotfiles?) #f (car dotfiles?)))
-              (path-pointer (string->c-utf8 dir))
+              (path-pointer (string->c-bytevector dir))
               (directory-pointer (c-opendir path-pointer))
               (error-message "directory-files error")
-              (error-pointer (string->c-utf8 error-message))
+              (error-pointer (string->c-bytevector error-message))
               (dotfile? (lambda (name) (char=? (string-ref name 0) #\.)))
               (looper (lambda (directory-entity files)
-                        (if (c-null? directory-entity)
+                        (if (c-bytevector-null? directory-entity)
                           files
                           (let ((name (pointer-string-read directory-entity
                                                            d-name-offset)))
@@ -208,30 +208,30 @@
                                           ((not (dotfile? name))
                                            (cons name files))
                                           (else files))))))))
-      (when (c-null? directory-pointer)
+      (when (c-bytevector-null? directory-pointer)
         (c-perror error-pointer)
-        ;(c-free error-pointer)
-        ;(c-free directory)
-        ;(c-free path-pointer)
+        ;(c-bytevector-free error-pointer)
+        ;(c-bytevector-free directory)
+        ;(c-bytevector-free path-pointer)
         (error error-message))
       (let ((files (looper (c-readdir directory-pointer) (list))))
-        ;(c-free error-pointer)
-        ;(c-free directory-pointer)
-        ;(c-free path-pointer)
+        ;(c-bytevector-free error-pointer)
+        ;(c-bytevector-free directory-pointer)
+        ;(c-bytevector-free path-pointer)
         (c-closedir directory-pointer)
         files))))
 
 (define real-path
   (lambda (path)
-    (let* ((path-pointer (string->c-utf8 path))
-           (real-path-pointer (c-realpath path-pointer (make-c-null)))
-           (real-path (string-copy (c-utf8->string real-path-pointer))))
-      (c-free path-pointer)
-      (c-free real-path-pointer)
+    (let* ((path-pointer (string->c-bytevector path))
+           (real-path-pointer (c-realpath path-pointer (c-bytevector-null)))
+           (real-path (string-copy (c-bytevector->string real-path-pointer))))
+      (c-bytevector-free path-pointer)
+      (c-bytevector-free real-path-pointer)
       real-path)))
 
 (define (set-file-mode path mode)
-  (c-chmod (string->c-utf8 path)
+  (c-chmod (string->c-bytevector path)
            (string->number (string-append "#o" (number->string mode)))))
 
 (define-record-type <directory>
@@ -241,14 +241,14 @@
   (dot-files? directory:dot-files?))
 
 (define (open-directory path . dot-files?)
-  (make-directory (c-opendir (string->c-utf8 path))
+  (make-directory (c-opendir (string->c-bytevector path))
                   (if (null? dot-files?)
                     #f
                     (car dot-files?))))
 
 (define (read-directory directory-object)
   (let ((directory-entity (c-readdir (directory:handle directory-object))))
-    (if (c-null? directory-entity)
+    (if (c-bytevector-null? directory-entity)
       (eof-object)
       (let ((name (pointer-string-read directory-entity d-name-offset)))
         (cond ((or (string=? name ".")
@@ -304,12 +304,12 @@
   (let* ((path-pointer (make-c-bytevector 1024))
          (path (begin
                  (c-getcwd path-pointer 1024)
-                 (string-copy (c-utf8->string path-pointer)))))
-    (c-free path-pointer)
+                 (string-copy (c-bytevector->string path-pointer)))))
+    (c-bytevector-free path-pointer)
     path))
 
 (define (set-current-directory! path)
-  (c-chdir (string->c-utf8 path)))
+  (c-chdir (string->c-bytevector path)))
 
 (define (pid)
   (c-getpid))
@@ -339,7 +339,7 @@
                                                  ))))))
 
 (define (user-supplementary-gids)
-  (let* ((group-count (c-getgroups 0 (make-c-null)))
+  (let* ((group-count (c-getgroups 0 (c-bytevector-null)))
          (groups (make-c-bytevector (* (c-type-size 'int) group-count))))
     (c-getgroups group-count groups)
     (groups-loop group-count 0 groups (list))))
@@ -357,10 +357,10 @@
 (define (user-info uid/name)
   (let ((password-struct (if (number? uid/name)
                            (c-getpwuid uid/name)
-                           (c-getpwnam (string->c-utf8 uid/name)))))
-    (make-user-info (c-utf8->string (c-bytevector-ref password-struct
-                                                      'pointer
-                                                      0))
+                           (c-getpwnam (string->c-bytevector uid/name)))))
+    (make-user-info (c-bytevector->string (c-bytevector-ref password-struct
+                                                            'pointer
+                                                            0))
                     (c-bytevector-ref password-struct
                                       'int
                                       (* (c-type-size 'pointer) 2))
@@ -368,18 +368,18 @@
                                       'int
                                       (+ (* (c-type-size 'pointer) 2)
                                          (c-type-size 'int)))
-                    (c-utf8->string (c-bytevector-ref password-struct
-                                                      'pointer
-                                                      (+ (* (c-type-size 'pointer) 3)
-                                                         (* (c-type-size 'int) 2))))
-                    (c-utf8->string (c-bytevector-ref password-struct
-                                                      'pointer
-                                                      (+ (* (c-type-size 'pointer) 4)
-                                                         (* (c-type-size 'int) 2))))
-                    (c-utf8->string (c-bytevector-ref password-struct
-                                                      'pointer
-                                                      (+ (* (c-type-size 'pointer) 2)
-                                                         (* (c-type-size 'int) 2)))))))
+                    (c-bytevector->string (c-bytevector-ref password-struct
+                                                            'pointer
+                                                            (+ (* (c-type-size 'pointer) 3)
+                                                               (* (c-type-size 'int) 2))))
+                    (c-bytevector->string (c-bytevector-ref password-struct
+                                                            'pointer
+                                                            (+ (* (c-type-size 'pointer) 4)
+                                                               (* (c-type-size 'int) 2))))
+                    (c-bytevector->string (c-bytevector-ref password-struct
+                                                            'pointer
+                                                            (+ (* (c-type-size 'pointer) 2)
+                                                               (* (c-type-size 'int) 2)))))))
 
 
 (define-record-type <group-info>
@@ -391,15 +391,15 @@
 (define (group-info gid/name)
   (let ((group-struct (if (number? gid/name)
                         (c-getgrgid gid/name)
-                        (c-getgrnam (string->c-utf8 gid/name)))))
+                        (c-getgrnam (string->c-bytevector gid/name)))))
     (make-group-info
-      (c-utf8->string (c-bytevector-ref group-struct 'pointer 0))
+      (c-bytevector->string (c-bytevector-ref group-struct 'pointer 0))
       (c-bytevector-ref group-struct
                         'int
                         (* (c-type-size 'pointer) 2)))))
 
 (define (set-environment-variable! name value)
-  (c-setenv (string->c-utf8 name) (string->c-utf8 value) 1))
+  (c-setenv (string->c-bytevector name) (string->c-bytevector value) 1))
 
 (define (delete-environment-variable! name)
-  (c-unsetenv (string->c-utf8 name)))
+  (c-unsetenv (string->c-bytevector name)))

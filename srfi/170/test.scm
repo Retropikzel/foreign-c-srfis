@@ -1,3 +1,4 @@
+(test-begin "srfi-170")
 
 (display (real-path "Makefile"))
 (newline)
@@ -144,3 +145,5 @@
 (display "file-info-directory? on file: ")
 (write (file-info-directory? tmp-file-info))
 (newline)
+
+(test-begin "srfi-170")
