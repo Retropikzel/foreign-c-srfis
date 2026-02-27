@@ -29,11 +29,11 @@ install:
 uninstall:
 	-snow-chibi remove --impls=${SCHEME} ${PKG}
 
-init-venv: build
+run-test-venv: build
 	rm -rf venv
 	scheme-venv ${SCHEME} ${RNRS} venv
-	echo "(import (scheme base) (scheme write) (scheme read) (scheme char) (scheme file) (scheme process-context) (srfi 64) (srfi ${SRFI}))" > venv/test.scm
-	printf "#!r6rs\n(import (rnrs) (srfi :64) (srfi :${SRFI}))" > venv/test.sps
+	echo "(import (scheme base) (scheme write) (scheme read) (scheme char) (scheme file) (scheme process-context) (srfi 64) (foreign c) (srfi ${SRFI}))" > venv/test.scm
+	printf "#!r6rs\n(import (rnrs) (srfi :64) (foreign c) (srfi :${SRFI}))" > venv/test.sps
 	cat ${TESTFILE} >> venv/test.scm
 	cat ${TESTFILE} >> venv/test.sps
 	if [ "${RNRS}" = "r6rs" ]; then if [ -d ../foreign-c ]; then cp -r ../foreign-c/foreign venv/lib/; fi; fi
@@ -46,8 +46,6 @@ init-venv: build
 	if [ "${SCHEME}" = "chicken" ]; then ./venv/bin/snow-chibi install --always-yes srfi.64; fi
 	if [ "${SCHEME}-${RNRS}" = "mosh-r7rs" ]; then ./venv/bin/snow-chibi install --always-yes srfi.64; fi
 	if [ "${RNRS}" = "r7rs" ]; then ./venv/bin/snow-chibi install ${PKG}; fi
-
-run-test: init-venv
 	if [ "${RNRS}" = "r6rs" ]; then ./venv/bin/scheme-compile venv/test.sps; fi
 	if [ "${RNRS}" = "r7rs" ]; then CSC_OPTIONS="-L -lcurl" ./venv/bin/scheme-compile venv/test.scm; fi
 	./venv/test

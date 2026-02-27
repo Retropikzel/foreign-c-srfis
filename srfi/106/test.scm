@@ -1,8 +1,9 @@
+(test-begin "srfi-106")
 
 (define sock1-port "3005")
 (define sock2-port "3006")
 
-(define-c-library libc `("stdlib.h") libc-name '((additional-versions ("0" "6"))))
+(define-c-library libc `("stdlib.h") #f '())
 (define-c-procedure c-system libc 'system 'int '(pointer))
 
 (display "Testing TCP socket")
@@ -13,7 +14,7 @@
 ;(debug (socket-domain stream))
 ;(debug (ip-protocol ip))
 
-(c-system (string->c-utf8 (string-append "echo \"lol\" | nc -l " sock1-port "&")))
+(c-system (string->c-bytevector (string-append "echo \"lol\" | nc -l " sock1-port "&")))
 
 (define sock1 (make-client-socket "127.0.0.1" sock1-port))
 
@@ -40,3 +41,4 @@
 (write (utf8->string (socket-recv client-sock1 3)))
 (newline)
 
+(test-end "srfi-106")

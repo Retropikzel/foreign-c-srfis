@@ -1,5 +1,5 @@
 (define-c-library libc
-                  `("sys/types.h"
+                  '("sys/types.h"
                     "sys/socket.h"
                     "sys/un.h"
                     "netinet/in.h"
@@ -8,8 +8,8 @@
                     "fcntl.h"
                     "poll.h"
                     "string.h")
-                  libc-name
-                  '((additional-versions ("0" "6"))))
+                  #f
+                  '())
 
 (define-c-procedure c-socket libc 'socket 'int '(int int int))
 (define-c-procedure c-setsockopt libc 'setsockopt 'int '(int int int pointer int))
@@ -103,8 +103,8 @@
                  (call-with-address-of
                    addrinfo-hints
                    (lambda (addrinfo-hints-address)
-                     (c-getaddrinfo (string->c-utf8 node)
-                                    (string->c-utf8 service)
+                     (c-getaddrinfo (string->c-bytevector node)
+                                    (string->c-bytevector service)
                                     addrinfo-hints
                                     addrinfo-address))))))
            (socket-file-descriptor
@@ -113,13 +113,13 @@
                (c-bytevector-ref addrinfo 'int ai-socktype-offset)
                (c-bytevector-ref addrinfo 'int ai-protocol-offset))))
       (when (< addrinfo-result 0)
-        (c-perror (string->c-utf8 "make-client-socket (addrinfo) error"))
+        (c-perror (string->c-bytevector "make-client-socket (addrinfo) error"))
         (raise-continuable "make-client-socket (addrinfo) error"))
       (when (< socket-file-descriptor 0)
-        (c-perror (string->c-utf8 "make-client-socket (socket) error"))
+        (c-perror (string->c-bytevector "make-client-socket (socket) error"))
         (raise-continuable "make-client-socket (socket) error"))
       (when (< (c-fcntl socket-file-descriptor F-SETFL O-NONBLOCK) 0)
-        (c-perror (string->c-utf8 "make-client-socket (fcntl) error"))
+        (c-perror (string->c-bytevector "make-client-socket (fcntl) error"))
         (raise-continuable "make-client-socket (fcntl) error"))
       (letrec* ((ai-addr-offset (* (c-type-size 'int) 6))
                 (ai-addrlen-offset (* (c-type-size 'int) 4))
@@ -132,7 +132,7 @@
         (c-bytevector-set! pollfd 'int 0 0)
         ;; FIXME No magic numbers, like 8 or 1 here. Put into variable with good name
         ;; TODO Why 8 works but 1 does not?
-        (when (= (c-poll pollfd 8 5000) 0)
+        #;(when (= (c-poll pollfd 8 5000) 0)
           (error "make-client-socket (poll) error")))
       (make-socket socket-file-descriptor))))
 
@@ -153,7 +153,7 @@
          (msg-len (bytevector-length bv))
          (sent-count (c-send (socket-file-descriptor socket) msg msg-len 0)))
     (when (= sent-count -1)
-      (c-perror (string->c-utf8 "socket-send error"))
+      (c-perror (string->c-bytevector "socket-send error"))
       (raise-continuable "socket-send error"))
     sent-count))
 
@@ -194,26 +194,26 @@
                                 (c-type-size 'u16)
                                 (c-htons (string->number service)))
              (c-bytevector-set! pointer 'u16 (* (c-type-size 'u16) 2) INADDR-ANY)
-             ;(c-strcpy node-pointer (string->c-utf8 node))
+             ;(c-strcpy node-pointer (string->c-bytevector node))
              pointer))
          (option (let ((pointer (make-c-bytevector (c-type-size 'int))))
                    (c-bytevector-set! pointer 'int 0 1)
                    pointer))
          (sockaddr-size (+ *ai-family-size* (bytevector-length (string->utf8 node)))))
     (when (< socket-file-descriptor 0)
-      (c-perror (string->c-utf8 "make-server-socket (socket) error"))
+      (c-perror (string->c-bytevector "make-server-socket (socket) error"))
       (raise-continuable "make-server-socket (socket) error"))
     (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEADDR option (c-type-size 'int)) 0)
-      (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEADDR) error"))
+      (c-perror (string->c-bytevector "make-server-socket (setsockopt SO-REUSEADDR) error"))
       (raise-continuable "make-server-socket (setsockopt SO-REUSEADDR) error"))
     (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEPORT option (c-type-size 'int)) 0)
-      (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEPORT) error"))
+      (c-perror (string->c-bytevector "make-server-socket (setsockopt SO-REUSEPORT) error"))
       (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
     (when (< (c-bind socket-file-descriptor sockaddr *sockaddr-size*) 0)
-      (c-perror (string->c-utf8 "socket-accept (bind) error"))
+      (c-perror (string->c-bytevector "socket-accept (bind) error"))
       (raise-continuable "socket-accept (bind) error"))
     (when (< (c-listen socket-file-descriptor 0) 0)
-      (c-perror (string->c-utf8 "make-server-socket (listen) error"))
+      (c-perror (string->c-bytevector "make-server-socket (listen) error"))
       (raise-continuable "make-server-socket (listen) error"))
     (make-socket socket-file-descriptor)))
 
@@ -240,8 +240,8 @@
                  (call-with-address-of
                    addrinfo-hints
                    (lambda (addrinfo-hints-address)
-                     (c-getaddrinfo (string->c-utf8 "0.0.0.0")
-                                    (string->c-utf8 service)
+                     (c-getaddrinfo (string->c-bytevector "0.0.0.0")
+                                    (string->c-bytevector service)
                                     addrinfo-hints
                                     addrinfo-address))))))
            (socket-file-descriptor
@@ -257,22 +257,22 @@
            (ai-addrlen-offset (* (c-type-size 'int) 4))
            (ai-addr-len (c-bytevector-ref addrinfo 'int ai-addrlen-offset)))
       (when (< addrinfo-result 0)
-        (c-perror (string->c-utf8 "make-server-socket (addrinfo) error"))
+        (c-perror (string->c-bytevector "make-server-socket (addrinfo) error"))
         (raise-continuable "make-server-socket (addrinfo) error"))
       (when (< socket-file-descriptor 0)
-        (c-perror (string->c-utf8 "make-server-socket (socket) error"))
+        (c-perror (string->c-bytevector "make-server-socket (socket) error"))
         (raise-continuable "make-server-socket (socket) error"))
       (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEADDR option (c-type-size 'int)) 0)
-        (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEADDR) error"))
+        (c-perror (string->c-bytevector "make-server-socket (setsockopt SO-REUSEADDR) error"))
         (raise-continuable "make-server-socket (setsockopt SO-REUSEADDR) error"))
       (when (< (c-setsockopt socket-file-descriptor SOL-SOCKET SO-REUSEPORT option (c-type-size 'int)) 0)
-        (c-perror (string->c-utf8 "make-server-socket (setsockopt SO-REUSEPORT) error"))
+        (c-perror (string->c-bytevector "make-server-socket (setsockopt SO-REUSEPORT) error"))
         (raise-continuable "make-server-socket (setsockopt SO-REUSEPORT) error"))
       (when (< (c-bind socket-file-descriptor ai-addr ai-addr-len) 0)
-        (c-perror (string->c-utf8 "make-server-socket (bind) error"))
+        (c-perror (string->c-bytevector "make-server-socket (bind) error"))
         (raise-continuable "make-server-socket (bind) error"))
       (when (< (c-listen socket-file-descriptor 5) 0)
-        (c-perror (string->c-utf8 "make-server-socket (listen) error"))
+        (c-perror (string->c-bytevector "make-server-socket (listen) error"))
         (raise-continuable "make-server-socket (listen) error"))
       (make-socket socket-file-descriptor))))
 
@@ -285,7 +285,7 @@
                                     client-sockaddr
                                     addrlen)))
     (when (< accepted-socket 0)
-      (c-perror (string->c-utf8 "socket-accept (accept) error"))
+      (c-perror (string->c-bytevector "socket-accept (accept) error"))
       (raise-continuable "socket-accept (accept) error"))
     (make-socket accepted-socket)))
 
