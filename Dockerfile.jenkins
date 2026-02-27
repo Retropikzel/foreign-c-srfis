@@ -1,0 +1,2 @@
+FROM debian:trixie
+RUN apt-get update && apt-get -y install make docker.io git

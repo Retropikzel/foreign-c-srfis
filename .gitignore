@@ -2,3 +2,6 @@
 venv
 *.html
 *.log
+foreign
+run-test*
+
