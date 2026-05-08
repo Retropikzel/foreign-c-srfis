@@ -1,9 +1,9 @@
 (test-begin "srfi-170")
 
-(display (real-path "Makefile"))
-(newline)
+;(display (real-path "Makefile"))
+;(newline)
 
-(exit 0)
+;(exit 0)
 
 (define tmp-dir "/tmp/foreign-c-srfi-170")
 (when (file-exists? tmp-dir) (delete-directory tmp-dir))

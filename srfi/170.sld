@@ -48,7 +48,7 @@
           open-directory
           read-directory
           close-directory
-          real-path
+          ;real-path
           ;file-space
           temp-file-prefix
           create-temp-file

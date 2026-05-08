@@ -1,4 +1,4 @@
-To SRFI library run
+To install SRFI library run
 
     make SCHEME=chibi SRFI=106 build install
 
