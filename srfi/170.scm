@@ -14,6 +14,7 @@
 
 (define-c-procedure c-perror libc 'perror 'void '(pointer))
 (define-c-procedure c-mkdir libc 'mkdir 'int '(pointer int))
+(define-c-procedure c-mkfifo libc 'mkfifo 'int '(pointer int))
 (define-c-procedure c-rmdir libc 'rmdir 'int '(pointer))
 (define-c-procedure c-stat libc 'stat 'int '(pointer pointer))
 (define-c-procedure c-lstat libc 'stat 'int '(pointer pointer))
@@ -134,8 +135,10 @@
     (let* ((fname-pointer (string->c-bytevector fname))
            (mode (if (null? permission-bits)
                    #o775
-                   (string->number (string-append "#o"
-                                                  (number->string (car permission-bits))))))
+                   (string->number
+                     (string-append
+                       "#o"
+                       (number->string (car permission-bits))))))
            (result (c-mkdir fname-pointer mode))
            (error-message "create-directory error")
            (error-pointer (string->c-bytevector error-message)))
@@ -143,7 +146,26 @@
       (when (< result 0)
         (c-perror error-pointer)
         (c-bytevector-free error-pointer)
-        (error error-message)))))
+        (error error-message))
+      (c-bytevector-free error-pointer))))
+
+(define (create-fifo fname . permission-bits)
+  (let* ((fname-pointer (string->c-bytevector fname))
+         (mode (if (null? permission-bits)
+                 #o664
+                 (string->number
+                   (string-append
+                     "#o"
+                     (number->string (car permission-bits))))))
+         (result (c-mkfifo fname-pointer mode))
+         (error-message "create-fifo error")
+         (error-pointer (string->c-bytevector error-message)))
+    (c-bytevector-free fname-pointer)
+    (when (< result 0)
+      (c-perror error-pointer)
+      (c-bytevector-free error-pointer)
+      (error error-message))
+    (c-bytevector-free error-pointer)))
 
 (define (create-hard-link old-fname new-fname)
   (c-link (string->c-bytevector old-fname)
@@ -154,7 +176,8 @@
            (string->c-bytevector new-fname)))
 
 (define (rename-file old-fname new-fname)
-  (c-rename (string->c-bytevector old-fname) (string->c-bytevector new-fname)))
+  (c-rename (string->c-bytevector old-fname)
+            (string->c-bytevector new-fname)))
 
 (define (delete-directory fname)
   (let* ((fname-pointer (string->c-bytevector fname))

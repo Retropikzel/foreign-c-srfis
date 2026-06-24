@@ -36,9 +36,6 @@ package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
 install:
 	snow-chibi install --impls=${SCHEME} ${PKG}
 
-uninstall:
-	-snow-chibi remove --impls=${SCHEME} ${PKG}
-
 testfiles:
 	rm -rf .tmp
 	mkdir -p .tmp

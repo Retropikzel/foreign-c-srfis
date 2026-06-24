@@ -12,7 +12,7 @@
           ;open-file
           ;fd->port
           create-directory
-          ;create-fifo
+          create-fifo
           create-hard-link
           create-symlink
           ;read-symlink
