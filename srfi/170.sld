@@ -15,7 +15,7 @@
           create-fifo
           create-hard-link
           create-symlink
-          ;read-symlink
+          read-symlink
           rename-file
           delete-directory
           set-file-owner
