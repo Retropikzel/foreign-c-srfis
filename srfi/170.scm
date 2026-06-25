@@ -47,6 +47,7 @@
 (define-c-procedure c-link libc 'link 'int '(pointer pointer))
 (define-c-procedure c-slink libc 'link 'int '(pointer pointer))
 (define-c-procedure c-chown libc 'chown 'int '(pointer int int))
+(define-c-procedure c-clock-gettime libc 'clock_gettime 'int '(int pointer))
 
 (define slash (cond-expand (windows "\\") (else "/")))
 (define randomized? #f)
@@ -450,3 +451,34 @@
 
 (define (delete-environment-variable! name)
   (c-unsetenv (string->c-bytevector name)))
+
+(define CLOCK_REALTIME 0)
+(define CLOCK_MONOTONIC 1)
+(define tv_sec-type 'long)
+(define tv_nsec-type 'long)
+(define timespec (make-c-bytevector (c-type-size+ tv_sec-type tv_nsec-type)))
+(define (posix-time)
+  (let* ((result (c-clock-gettime CLOCK_REALTIME timespec)))
+    (cond
+      ((< result 0)
+       (let* ((error-message "posix-time error")
+              (error-pointer (string->c-bytevector error-message)))
+         (c-perror error-pointer)
+         (c-bytevector-free timespec)
+         (c-bytevector-free error-pointer)
+         (error error-message)))
+      (else
+        (let* ((tv-sec (c-bytevector-ref timespec tv_sec-type 0))
+               (tv-nsec (c-bytevector-ref timespec
+                                                 tv_nsec-type
+                                                 (c-type-size tv_sec-type)))
+               (time (make-time time-utc tv-sec tv-nsec)))
+          (display "HERE: tv-sec ")
+          (write tv-sec)
+          (newline)
+          (display "HERE: tv-nsec ")
+          (write tv-nsec)
+          (newline)
+          time
+          )))
+  ))

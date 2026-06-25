@@ -5,7 +5,8 @@
           (scheme write)
           (scheme file)
           (scheme process-context)
-          (foreign c))
+          (foreign c)
+          (srfi 19))
   (export ;posix-error?
           ;posix-error-name
           ;posix-error-message
@@ -77,7 +78,7 @@
           group-info?
           group-info:name
           group-info:gid
-          ;posix-time
+          posix-time
           ;monotonic-time
           set-environment-variable!
           delete-environment-variable!
