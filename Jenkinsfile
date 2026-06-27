@@ -38,7 +38,7 @@ pipeline {
     }
 
     stages {
-        stage('x86_64 Debian') {
+        stage('R6RS Debian') {
             steps {
                 script {
                     env.SRFIS.split().each { SRFI ->
@@ -53,7 +53,7 @@ pipeline {
                 }
             }
         }
-        stage('R7RS x86_64 Debian') {
+        stage('R7RS Debian') {
             steps {
                 script {
                     env.SRFIS.split().each { SRFI ->
