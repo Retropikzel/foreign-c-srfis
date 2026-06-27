@@ -36,7 +36,9 @@ package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
 install:
 	snow-chibi install --impls=${SCHEME} ${PKG}
 
-testfiles:
+${PKG}: package
+
+testfiles: ${PKG}
 	rm -rf .tmp
 	mkdir -p .tmp
 	cp ${PKG} .tmp
@@ -50,11 +52,11 @@ testfiles:
 		fi; \
 	fi
 
-test: testfiles package
+test: testfiles
 	cd .tmp && COMPILE_R7RS=${SCHEME} compile-r7rs -o test-program test.${SFX}
 	cd .tmp && ./test-program
 
-test-docker: testfiles package
+test-docker: testfiles
 	cd .tmp && \
 		DOCKER_TAG=${DOCKER_TAG} \
 		SNOW_PACKAGES="srfi.64 ${PKG}" \
