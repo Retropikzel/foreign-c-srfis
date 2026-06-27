@@ -41,9 +41,14 @@ testfiles:
 	mkdir -p .tmp
 	cp ${PKG} .tmp
 	cp -r srfi .tmp/
-	cat test-headers.${SFX} ${TESTFILE} | sed 's/SRFI/${SRFI}/' > .tmp/test.${SFX}
+	cat test-headers.${SFX} ${TESTFILE} \
+		| sed 's/SRFI/${SRFI}/' > .tmp/test.${SFX}
 	cat ${TESTFILE} >> run-test.${SFX}
-	if [ "${RNRS}" = "r6rs" ]; then if [ -d ../foreign-c ]; then cp -r ../foreign-c/foreign .tmp/; fi; fi
+	if [ "${RNRS}" = "r6rs" ]; \
+		then if [ -d ../foreign-c ]; \
+		then cp -r ../foreign-c/foreign .tmp/; \
+		fi; \
+	fi
 
 test: testfiles package
 	cd .tmp && COMPILE_R7RS=${SCHEME} compile-r7rs -o test-program test.${SFX}
@@ -52,7 +57,7 @@ test: testfiles package
 test-docker: testfiles package
 	cd .tmp && \
 		DOCKER_TAG=${DOCKER_TAG} \
-		SNOW_PACKAGES="srfi.64 srfi.60 srfi.145 srfi.180 retropikzel.mouth foreign.c ${PKG}" \
+		SNOW_PACKAGES="srfi.64 ${PKG}" \
 		APT_PACKAGES="libcurl4-openssl-dev" \
 		COMPILE_R7RS=${SCHEME} \
 		TEST_R7RS_DEBUG=1 \

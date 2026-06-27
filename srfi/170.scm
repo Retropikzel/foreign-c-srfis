@@ -206,14 +206,14 @@
 
 (define (delete-directory fname)
   (let* ((fname-pointer (string->c-bytevector fname))
-         (result (c-rmdir fname-pointer))
-         (error-message "delete-directory error")
-         (error-pointer (string->c-bytevector error-message)))
+         (result (c-rmdir fname-pointer)))
     (c-bytevector-free fname-pointer)
     (when (< result 0)
-      (c-perror error-pointer)
-      (c-bytevector-free error-pointer)
-      (error error-message))))
+      (let* ((error-message "delete-directory error")
+             (error-pointer (string->c-bytevector error-message)))
+        (c-perror error-pointer)
+        (c-bytevector-free error-pointer)
+        (error error-message)))))
 
 (define (set-file-owner fname uid gid)
   (let ((fname-pointer (string->c-bytevector fname)))
@@ -468,17 +468,8 @@
          (c-bytevector-free error-pointer)
          (error error-message)))
       (else
-        (let* ((tv-sec (c-bytevector-ref timespec tv_sec-type 0))
-               (tv-nsec (c-bytevector-ref timespec
-                                                 tv_nsec-type
-                                                 (c-type-size tv_sec-type)))
-               (time (make-time time-utc tv-sec tv-nsec)))
-          (display "HERE: tv-sec ")
-          (write tv-sec)
-          (newline)
-          (display "HERE: tv-nsec ")
-          (write tv-nsec)
-          (newline)
-          time
-          )))
-  ))
+        (make-time time-utc
+                   (c-bytevector-ref timespec
+                                     tv_nsec-type
+                                     (c-type-size tv_sec-type))
+                   (c-bytevector-ref timespec tv_sec-type 0))))))

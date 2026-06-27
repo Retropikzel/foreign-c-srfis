@@ -1,12 +1,12 @@
 (test-begin "srfi-170")
 
-;(display (real-path "Makefile"))
-;(newline)
-
-;(exit 0)
-
 (define tmp-dir "/tmp/foreign-c-srfi-170")
-(when (file-exists? tmp-dir) (delete-directory tmp-dir))
+(for-each
+  (lambda (file)
+    (delete-file (string-append tmp-dir "/" file)))
+  (directory-files tmp-dir #t))
+(when (file-exists? tmp-dir)
+  (delete-directory tmp-dir))
 (create-directory tmp-dir)
 
 (define tmp-file (string-append tmp-dir "/test.txt"))
@@ -146,4 +146,7 @@
 (write (file-info-directory? tmp-file-info))
 (newline)
 
-(test-begin "srfi-170")
+(write (posix-time))
+(newline)
+
+(test-end "srfi-170")

@@ -12,38 +12,36 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
     }
 
-    parameters {
-        string(name: 'R7RS_SCHEMES', defaultValue: 'chibi chicken gauche guile kawa mosh racket sagittarius stklos ypsilon', description: '')
-        string(name: 'R6RS_SCHEMES', defaultValue: 'chezscheme guile ikarus ironscheme mosh racket sagittarius ypsilon', description: '')
-        string(name: 'SRFIS', defaultValue: '106 170', description: '')
+    environment {
+        R7RS_SCHEMES="capyscheme chibi chicken gauche kawa mosh racket sagittarius stklos ypsilon"
+        R6RS_SCHEMES="chezscheme guile ikarus ironscheme mosh racket sagittarius ypsilon"
+        SRFIS="170"
     }
 
     stages {
-        stage('Tests') {
-            stage('R6RS x86_64 Debian') {
-                steps {
-                    script {
-                        params.SRFIS.split().each { SRFI ->
-                            params.R6RS_SCHEMES.split().each { SCHEME ->
-                                stage("${SCHEME} - ${SRFI}") {
-                                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                                        sh "timeout 600 make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs run-test-docker"
-                                    }
+        stage('x86_64 Debian') {
+            steps {
+                script {
+                    env.SRFIS.split().each { SRFI ->
+                        env.R6RS_SCHEMES.split().each { SCHEME ->
+                            stage("${SCHEME} ${SRFI}") {
+                                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs run-test-docker"
                                 }
                             }
                         }
                     }
                 }
             }
-            stage('R7RS x86_64 Debian') {
-                steps {
-                    script {
-                        params.SRFIS.split().each { SRFI ->
-                            params.R7RS_SCHEMES.split().each { SCHEME ->
-                                stage("${SCHEME} - ${SRFI}") {
-                                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                                        sh "timeout 600 make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs run-test-docker"
-                                    }
+        }
+        stage('R7RS x86_64 Debian') {
+            steps {
+                script {
+                    env.SRFIS.split().each { SRFI ->
+                        env.R7RS_SCHEMES.split().each { SCHEME ->
+                            stage("${SCHEME} ${SRFI}") {
+                                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs run-test-docker"
                                 }
                             }
                         }
