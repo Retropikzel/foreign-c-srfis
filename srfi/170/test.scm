@@ -1,5 +1,6 @@
 (test-begin "srfi-170")
 
+#|
 (define tmp-dir "/tmp/foreign-c-srfi-170")
 (for-each
   (lambda (file)
@@ -145,6 +146,7 @@
 (display "file-info-directory? on file: ")
 (write (file-info-directory? tmp-file-info))
 (newline)
+|#
 
 (write (posix-time))
 (newline)

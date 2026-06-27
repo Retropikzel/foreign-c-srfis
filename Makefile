@@ -18,9 +18,6 @@ SFX=sps
 endif
 
 DOCKER_TAG=head
-ifeq "${SCHEME}" "chicken"
-DOCKER_TAG=5
-endif
 
 all: package
 
