@@ -21,6 +21,7 @@
 (define-c-procedure c-lstat libc 'stat 'int '(pointer pointer))
 (define-c-procedure c-open libc 'open 'int '(pointer int))
 (define-c-procedure c-opendir libc 'opendir 'pointer '(pointer))
+(define-c-procedure c-dirfd libc 'dirfd 'int '(pointer))
 (define-c-procedure c-readdir libc 'readdir 'pointer '(pointer))
 (define-c-procedure c-close libc 'close 'int '(int))
 (define-c-procedure c-closedir libc 'closedir 'int '(pointer))
@@ -49,6 +50,12 @@
 (define-c-procedure c-chown libc 'chown 'int '(pointer int int))
 (define-c-procedure c-clock-gettime libc 'clock_gettime 'int '(int pointer))
 (define-c-procedure c-nice libc 'nice 'int '(int))
+(define-c-procedure c-umask libc 'umask 'uint '(int))
+(define-c-procedure c-utimensat
+                    libc
+                    'utimensat
+                    'int
+                    '(int pointer pointer int))
 
 (define slash (cond-expand (windows "\\") (else "/")))
 (define randomized? #f)
@@ -298,6 +305,50 @@
     (c-chown fname-pointer uid gid)
     (c-bytevector-free fname-pointer)))
 
+(define-c-array-type timespec-array 'long)
+;;> \procedure{(set-file-times fname [access-time-object modify-time-object])}
+;;> This procedure sets the access and modified times for the file fname to
+;;> the supplied time object values. It is an error if they are not of type
+;;> time-utc. If neither time argument is supplied, they are both taken to be
+;;> the current time. The constants time/now and time/unchanged are bound to
+;;> values used to specify the current time and an unchanged time
+;;> respectively. It is an error if exactly one time is provided. This
+;;> procedure will follow symlinks and set the times of the file to which it
+;;> refers. If the procedure completes successfully, the file's time of last
+;;> status-change (ctime) is set to the current time.
+(define (set-file-times fname . args)
+  (when (and (not (= (length args) 0))
+             (not (= (length args) 2)))
+    (error
+      (string-append "set-file-times error: "
+                     "It is an error if exactly one time is provided")))
+  (let* ((current-time (posix-time))
+         (access-time-object (if (null? args)
+                               current-time
+                               (car args)))
+         (modify-time-object (if (or (null? args)
+                                     (< (length args) 2))
+                               current-time
+                               (cadr args)))
+         (fname-cbv (string->c-bytevector fname))
+         (timespecs-cbv (make-c-bytevector (c-type-size* 'long 4)))
+         (current-dir-cbv (string->c-bytevector (current-directory)))
+         (current-dir-stream (c-opendir current-dir-cbv))
+         (current-dir-fd (c-dirfd current-dir-stream)))
+    (c-bytevector-set!
+      timespecs-cbv timespec-array 0 (time-second access-time-object))
+    (c-bytevector-set!
+      timespecs-cbv timespec-array 1 (time-nanosecond access-time-object))
+    (c-bytevector-set!
+      timespecs-cbv timespec-array 2 (time-second modify-time-object))
+    (c-bytevector-set!
+      timespecs-cbv timespec-array 3 (time-nanosecond modify-time-object))
+    (c-utimensat current-dir-fd fname-cbv timespecs-cbv 0)
+    (c-bytevector-free fname-cbv)
+    (c-bytevector-free timespecs-cbv)
+    (c-bytevector-free current-dir-cbv)
+    (c-bytevector-free current-dir-stream)))
+
 (define (pointer-string-read pointer offset)
   (letrec* ((looper (lambda (c index result)
                       (if (char=? c #\null)
@@ -536,6 +587,19 @@
                         (car prefix)))
          (path (string-append real-prefix "-" (random-string 6))))
     (apply maker (list path))))
+
+;;> Returns the current file protection mask, or umask, as an exact integer.
+;;> Whenever a file is created, the specified or default permissions are
+;;> bitwise-anded with the complement of the umask before they are used.
+(define (umask)
+  (let ((mask (c-umask 0)))
+    (c-umask mask)
+    mask))
+
+;;> Sets the file protection mask to the exact integer umask and returns an
+;;> unspecified value.
+(define (set-umask! umask)
+  (c-umask umask))
 
 ;;> Returns the current directory as a string containing an absolute pathname.
 ;;> Whenever a file is referenced with a relative path, it is interpreted as

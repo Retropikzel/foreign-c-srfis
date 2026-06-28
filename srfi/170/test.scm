@@ -10,6 +10,7 @@
 (test-assert (number? niceness))
 (test-assert (> niceness 0))
 
+
 #|
 (define tmp-dir "/tmp/foreign-c-srfi-170")
 (for-each

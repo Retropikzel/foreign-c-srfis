@@ -20,7 +20,7 @@
           rename-file
           delete-directory
           set-file-owner
-          ;set-file-times
+          set-file-times
           ;truncate-file
           file-info
           file-info?
@@ -54,8 +54,8 @@
           temp-file-prefix
           create-temp-file
           call-with-temporary-filename
-          ;umask
-          ;set-umask!
+          umask
+          set-umask!
           current-directory
           set-current-directory!
           pid
