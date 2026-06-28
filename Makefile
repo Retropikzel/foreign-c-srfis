@@ -13,8 +13,10 @@ TMPDIR=.tmp/${SCHEME}
 PKG=srfi-${SRFI}-${VERSION}.tgz
 
 SFX=scm
+AKKU_PACKAGES=
 ifeq "${RNRS}" "r6rs"
 SFX=sps
+AKKU_PACKAGES="akku-r7rs"
 endif
 
 DOCKER_TAG=head
@@ -55,8 +57,8 @@ test: testfiles
 test-docker: testfiles
 	cd .tmp && \
 		DOCKER_TAG=${DOCKER_TAG} \
-		SNOW_PACKAGES="srfi.64 ${PKG}" \
-		AKKU_PACKAGES="akku-r7rs chez-srfi" \
+		SNOW_PACKAGES="srfi.19 srfi.64 foreign.c ${PKG}" \
+		AKKU_PACKAGES=${AKKU_PACKAGES} \
 		APT_PACKAGES="libcurl4-openssl-dev" \
 		COMPILE_R7RS=${SCHEME} \
 		TEST_R7RS_DEBUG=1 \

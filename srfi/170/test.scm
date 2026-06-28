@@ -10,13 +10,6 @@
 (test-assert (number? niceness))
 (test-assert (> niceness 0))
 
-(define ui (user-info "retropikzel"))
-(write ui)
-(newline)
-
-(write (user-info:parsed-full-name ui))
-(newline)
-
 #|
 (define tmp-dir "/tmp/foreign-c-srfi-170")
 (for-each
