@@ -22,11 +22,10 @@ DOCKER_TAG=head
 all: package
 
 package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
-	echo "<pre>$$(cat srfi/${SRFI}/README.md)</pre>" > ${README}
 	snow-chibi package \
 		--version=${VERSION} \
 		--authors=${AUTHOR} \
-		--doc=${README} \
+		--doc-from-scribble=1 \
 		--description="${DESCRIPTION}" \
 		${SRFI_FILE}
 

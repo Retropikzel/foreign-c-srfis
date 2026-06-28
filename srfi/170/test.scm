@@ -1,5 +1,15 @@
 (test-begin "srfi-170")
 
+(write (posix-time))
+(newline)
+
+(write (monotonic-time))
+(newline)
+
+(define niceness (nice 1))
+(test-assert (number? niceness))
+(test-assert (> niceness 0))
+
 #|
 (define tmp-dir "/tmp/foreign-c-srfi-170")
 (for-each
@@ -148,7 +158,5 @@
 (newline)
 |#
 
-(write (posix-time))
-(newline)
 
 (test-end "srfi-170")

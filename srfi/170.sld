@@ -49,7 +49,7 @@
           open-directory
           read-directory
           close-directory
-          ;real-path
+          real-path
           ;file-space
           temp-file-prefix
           create-temp-file
@@ -59,7 +59,7 @@
           current-directory
           set-current-directory!
           pid
-          ;nice
+          nice
           user-uid
           user-gid
           user-effective-uid
@@ -79,7 +79,7 @@
           group-info:name
           group-info:gid
           posix-time
-          ;monotonic-time
+          monotonic-time
           set-environment-variable!
           delete-environment-variable!
           ;terminal?

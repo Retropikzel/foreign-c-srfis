@@ -48,6 +48,7 @@
 (define-c-procedure c-slink libc 'link 'int '(pointer pointer))
 (define-c-procedure c-chown libc 'chown 'int '(pointer int int))
 (define-c-procedure c-clock-gettime libc 'clock_gettime 'int '(int pointer))
+(define-c-procedure c-nice libc 'nice 'int '(int))
 
 (define slash (cond-expand (windows "\\") (else "/")))
 (define randomized? #f)
@@ -96,10 +97,16 @@
   (follow? file-info:follow?))
 
 (define (file-info-directory? file-info)
-  (let ((handle (c-open (string->c-bytevector (file-info:fname/port file-info)) 2)))
+  (let ((handle (c-open (string->c-bytevector
+                          (file-info:fname/port file-info)) 2)))
     (cond ((> handle 0) (c-close handle) #f)
           (else #t))))
 
+;;> The file-info procedure returns a file-info record containing useful
+;;> information about a file. If the follow? flag is true the procedure will
+;;> follow symlinks and report on the file to which they refer. If follow? is
+;;> false the procedure checks the actual file itself, even if it's a symlink.
+;;> The follow? flag is ignored if the file argument is a port.
 (define (file-info fname/port follow?)
   (when (port? fname/port)
     (error "file-info implementation does not support ports as arguments"))
@@ -131,7 +138,8 @@
                            #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 12) (native-endianness))
                            fname/port
                            follow?)))
-
+;;> The permission-bits for create-directory default to #o775 but are masked
+;;> by the current umask.
 (define create-directory
   (lambda (fname . permission-bits)
     (let* ((fname-pointer (string->c-bytevector fname))
@@ -151,6 +159,8 @@
         (error error-message))
       (c-bytevector-free error-pointer))))
 
+;;> The permission-bits for create-directory default to #o664, but are masked
+;;> by the current umask.
 (define (create-fifo fname . permission-bits)
   (let* ((fname-pointer (string->c-bytevector fname))
          (mode (if (null? permission-bits)
@@ -198,12 +208,27 @@
               (c-bytevector-free buffer)
               name)))))
 
+;;> Return the filename referenced by the symlink fname.
 (define (read-symlink fname) (internal-read-symlink fname 128))
 
+;;> If you override an existing object, then old-fname and new-fname must
+;;> type-match — either both directories, or both non-directories.
+;;> This is required by the semantics of POSIX rename().
+;;>
+;;> Calling rename-file on a symbolic link will rename the symbolic link,
+;;> not the file it refers to.
+;;>
+;;> Remark: There is an unfortunate atomicity problem with the rename-file
+;;> procedure: if you create file new-fname sometime between rename-file's
+;;> existence check and the actual rename operation, your file will be
+;;> clobbered with old-fname. There is no way to prevent this problem; at
+;;> least it is highly unlikely to occur in practice.
 (define (rename-file old-fname new-fname)
   (c-rename (string->c-bytevector old-fname)
             (string->c-bytevector new-fname)))
 
+;;> This procedure deletes directories from the file system. An error is
+;;> signaled if fname is not a directory or is not empty.
 (define (delete-directory fname)
   (let* ((fname-pointer (string->c-bytevector fname))
          (result (c-rmdir fname-pointer)))
@@ -215,6 +240,12 @@
         (c-bytevector-free error-pointer)
         (error error-message)))))
 
+;;> This procedure sets the owner and group of a file specified by supplying
+;;> the filename. If the uid argument is the constant owner/unchanged, the
+;;> owner is not changed; if the gid argument is the constant group/unchanged,
+;;> the group is not changed. Setting file ownership usually requires root
+;;> privileges. This procedure follows symlinks and changes the files to which
+;;> they refer.
 (define (set-file-owner fname uid gid)
   (let ((fname-pointer (string->c-bytevector fname)))
     (c-chown fname-pointer uid gid)
@@ -234,6 +265,26 @@
 ; struct dirent d_name offset on linux
 (define d-name-offset 19)
 
+;;> Return a list of filenames in directory dir. The dotfiles? flag
+;;> (default #f) causes files beginning with . to be included in the list.
+;;> Regardless of the value of dotfiles?, the two files . and .. are never
+;;> returned.
+;;> The directory dir is not prepended to each filename in the result list.
+;;> That is,
+;;>
+;;>    (directory-files "/etc")
+;;>
+;;>returns
+;;>
+;;>    ("chown" "exports" "fstab" ...)
+;;>
+;;>not
+;;>
+;;>    ("/etc/chown" "/etc/exports" "/etc/fstab" ...)
+;;>
+;;> To use the filenames in the returned list, the programmer can either
+;;> manually prepend the directory, or change to the directory before using
+;;> the filenames.
 (define directory-files
   (lambda (dir . dotfiles?)
     (letrec* ((include-dotfiles? (if (null? dotfiles?) #f (car dotfiles?)))
@@ -269,15 +320,9 @@
         (c-closedir directory-pointer)
         files))))
 
-(define real-path
-  (lambda (path)
-    (let* ((path-pointer (string->c-bytevector path))
-           (real-path-pointer (c-realpath path-pointer (c-bytevector-null)))
-           (real-path (string-copy (c-bytevector->string real-path-pointer))))
-      (c-bytevector-free path-pointer)
-      (c-bytevector-free real-path-pointer)
-      real-path)))
-
+;;> This procedure sets the mode bits of a file specified by supplying the
+;;> filename. This procedure follows symlinks and changes the files to which
+;;> they refer.
 (define (set-file-mode path mode)
   (c-chmod (string->c-bytevector path)
            (string->number (string-append "#o" (number->string mode)))))
@@ -288,12 +333,24 @@
   (handle directory:handle)
   (dot-files? directory:dot-files?))
 
+;;> Opens the directory with the specified pathname for reading, returning an
+;;> opaque directory object.
+
+;;> The dot-files? argument controls whether filenames beginning with "." are
+;;> returned. If it is #f, which is the default, they are not. The filenames
+;;> . and .. are never returned.
 (define (open-directory path . dot-files?)
   (make-directory (c-opendir (string->c-bytevector path))
                   (if (null? dot-files?)
                     #f
                     (car dot-files?))))
 
+;;> Returns the name of the next available file, or the end-of-file object if
+;;> there are no more files.
+
+;;> The dot-files? argument controls whether filenames beginning with "." are
+;;> returned. If it is #f, which is the default, they are not. The filenames
+;;> . and .. are never returned.
 (define (read-directory directory-object)
   (let ((directory-entity (c-readdir (directory:handle directory-object))))
     (if (c-bytevector-null? directory-entity)
@@ -309,9 +366,26 @@
                (read-directory directory-object))
               (else name))))))
 
+;;> Closes a directory object.
 (define (close-directory directory-object)
   (c-closedir (directory:handle directory-object)))
 
+;;> Returns an absolute pathname derived from pathname that names the same
+;;> file and whose resolution does not involve dot (.), dot-dot (..), or
+;;> symlinks.
+(define real-path
+  (lambda (path)
+    (let* ((path-pointer (string->c-bytevector path))
+           (real-path-pointer (c-realpath path-pointer (c-bytevector-null)))
+           (real-path (string-copy (c-bytevector->string real-path-pointer))))
+      (c-bytevector-free path-pointer)
+      (c-bytevector-free real-path-pointer)
+      real-path)))
+
+;;> SRFI 39 or R7RS parameter that returns a string when invoked. Its initial
+;;> value is the value of the environment variable TMPDIR concatenated with
+;;> "/pid" if TMPDIR is set and to "/tmp/pid" otherwise, where pid is the id
+;;> of the current process.
 (define temp-file-prefix
   (make-parameter
     (if (get-environment-variable "TMPDIR")
@@ -323,14 +397,34 @@
         slash
         (number->string (c-getpid))))))
 
+;;> Creates a new temporary file and returns its name. The optional argument
+;;> specifies the filename prefix to use, and defaults to the result of
+;;> invoking temp-file-prefix. The procedure generates a sequence of filenames
+;;> that have prefix as a common prefix, looking for a filename that doesn't
+;;> already exist in the file system. When it finds one, it creates it with
+;;> permission #o600 and returns the filename. (The file permission can be
+;;> changed to a more permissive permission with set-file-mode after being
+;;> created.)
+
+;;> This file is guaranteed to be brand new. No other process will have it
+;;> open. This procedure does not simply return a filename that is very likely
+;;> to be unused. It returns a filename that definitely did not exist at the
+;;> moment create-temp-file created it.
+
+;;> It is not necessary for the process's pid to be a part of the filename
+;;> for the uniqueness guarantees to hold. The pid component of the default
+;;> prefix simply serves to scatter the name searches into sparse regions, so
+;;> that collisions are less likely to occur. This speeds things up, but does
+;;> not affect correctness.
 (define create-temp-file
   (lambda prefix
     (let* ((tmpdir (cond-expand
                      (windows (get-environment-variable "TMP"))
                      (else "/tmp")))
-           (real-prefix (if (null? prefix)
-                          (string-append tmpdir slash (number->string (c-getpid)))
-                          (car prefix)))
+           (real-prefix
+             (if (null? prefix)
+               (string-append tmpdir slash (number->string (c-getpid)))
+               (car prefix)))
            (path (string-append real-prefix "-" (random-string 6))))
       (if (file-exists? path)
         (create-temp-file real-prefix)
@@ -339,15 +433,66 @@
           (set-file-mode path 600)
           path)))))
 
+;;> This procedure can be used to perform certain atomic transactions on the
+;;> file system involving filenames. Some examples:
+;;>
+;;>     Linking a file to a fresh backup temp name.
+;;>     Creating and opening an unused, secure temp file.
+;;>     Creating an unused temporary directory. 
+;;>
+;;> This procedure uses prefix to generate a series of trial filenames. Prefix
+;;> is a string, and defaults to the value of invoking temp-file-prefix. File
+;;> names are generated by concatenating prefix with a varying string.
+;;>
+;;> The maker procedure is called serially on each filename generated. It must
+;;> return at least one value; it may return multiple values. If the first
+;;> return value is #f or if maker signals an exception indicating that the
+;;> file exists, call-with-temporary-filename will loop, generating a new
+;;> filename and calling maker again. If the first return value is true, the
+;;> loop is terminated, returning whatever value(s) maker returned.
+;;>
+;;> After a number of unsuccessful trials, call-with-temporary-filename may
+;;> give up, in which case an exception is signaled or propagated.
+;;>
+;;> To rename a file to a temporary name:
+;;>
+;;>     (call-with-temporary-filename
+;;>       (lambda (backup)
+;;>         (create-hard-link old-file backup)
+;;>         backup)
+;;>       ".temp.") ; Keep link in current working directory
+;;>     (delete-file old-file)
+;;>
+;;> Recall that this SRFI reports procedure failure by signaling an error.
+;;> This is critical for this example — the programmer can assume that if the
+;;> call-with-temporary-filename call returns, it returns successfully. So the
+;;> following delete-file call can be reliably invoked, safe in the knowledge
+;;> that the backup link has definitely been established.
+;;>
+;;> To create a unique temporary directory:
+;;>
+;;>     (call-with-temporary-filename
+;;>       (lambda (dir)
+;;>         (create-directory dir)
+;;>         dir)
+;;>       "/tmp/tempdir.")
+;;>
+;;> Similar operations can be used to generate unique fifos, or to return
+;;> values other than the new filename (for example, an open port).
 (define (call-with-temporary-filename maker . prefix)
   (let* ((tmpdir (cond-expand (windows (get-environment-variable "TMP"))
                               (else "/tmp")))
          (real-prefix (if (null? prefix)
-                        (string-append tmpdir slash (number->string (c-getpid)))
+                        (string-append tmpdir
+                                       slash
+                                       (number->string (c-getpid)))
                         (car prefix)))
          (path (string-append real-prefix "-" (random-string 6))))
     (apply maker (list path))))
 
+;;> Returns the current directory as a string containing an absolute pathname.
+;;> Whenever a file is referenced with a relative path, it is interpreted as
+;;> relative to this directory.
 (define (current-directory)
   (let* ((path-pointer (make-c-bytevector 1024))
          (path (begin
@@ -356,23 +501,34 @@
     (c-bytevector-free path-pointer)
     path))
 
+;;> Sets the current directory to new-directory and returns an unspecified
+;;> value.
 (define (set-current-directory! path)
   (c-chdir (string->c-bytevector path)))
 
-(define (pid)
-  (c-getpid))
+;;> Retrieves the process id for the current process.
+(define (pid) (c-getpid))
 
-(define (user-uid)
-  (c-getuid))
+;;> Increments the niceness of the current process by delta. The lower the
+;;> niceness value is, the more the process is favored during scheduling.
+;;> If delta is not specified, the increment is 1.
 
-(define (user-gid)
-  (c-getgid))
-
-(define (user-effective-uid)
-  (c-geteuid))
-
-(define (user-effective-gid)
-  (c-getegid))
+;;> Real-time processes are not affected by nice.
+(define nice
+  (lambda args
+    (let ((result (if (null? args) (c-nice 1) (c-nice (car args)))))
+      (when (< result 0)
+        (let* ((error-message "nice error")
+               (error-pointer (string->c-bytevector error-message)))
+          (c-perror error-pointer)
+          (c-bytevector-free timespec)
+          (c-bytevector-free error-pointer)
+          (error error-message)))
+      result)))
+(define (user-uid) (c-getuid))
+(define (user-gid) (c-getgid))
+(define (user-effective-uid) (c-geteuid))
+(define (user-effective-gid) (c-getegid))
 
 (define (groups-loop max-count count groups-pointer result)
   (if (>= count max-count)
@@ -402,6 +558,11 @@
   (shell user-info:shell)
   (full-name user-info:full-name))
 
+;;> Return a user-info record giving the recorded information for a particular
+;;> user. The uid/name argument is either an exact integer user id or a string
+;;> user name. If uid/name does not identify an existing user, #f is returned;
+;;> this does not constitute an error situation, and callers must be prepared
+;;> to handle it.
 (define (user-info uid/name)
   (let ((password-struct (if (number? uid/name)
                            (c-getpwuid uid/name)
@@ -446,10 +607,26 @@
                         'int
                         (* (c-type-size 'pointer) 2)))))
 
+;;> Change the value of the environment variable name to be value. Both name
+;;> and value are strings. If name is not defined at the time of call, a new
+;;> variable is added; if name is defined, its old value is discarded and
+;;> replaced by value. If name or value are invalid according to the operating
+;;> system, an exception is signaled. Mutating name or value after the call
+;;> must not change the name or value of the environment variable.
 (define (set-environment-variable! name value)
+  (when (not (string? name))
+    (error "set-environment-variable! error: name must be string"))
+  (when (not (string? value))
+    (error "set-environment-variable! error: value must be string"))
   (c-setenv (string->c-bytevector name) (string->c-bytevector value) 1))
 
+;;> Remove the environment variable name such that a subsequent
+;;> (get-environment-variable name) would return #f. If the variable cannot
+;;> be removed, an exception is signaled. If name does not currently have a
+;;> value, the call silently succeeds.
 (define (delete-environment-variable! name)
+  (when (not (string? name))
+    (error "delete-environment-variable! error: Name must be string"))
   (c-unsetenv (string->c-bytevector name)))
 
 (define CLOCK_REALTIME 0)
@@ -457,6 +634,11 @@
 (define tv_sec-type 'long)
 (define tv_nsec-type 'long)
 (define timespec (make-c-bytevector (c-type-size+ tv_sec-type tv_nsec-type)))
+
+;;> Returns the current time as a time object of type time-utc, which
+;;> represents the time since the POSIX epoch (midnight January 1, 1970
+;;> Universal Time), excluding leap seconds. It uses the POSIX CLOCK_REALTIME
+;;> clock.
 (define (posix-time)
   (let* ((result (c-clock-gettime CLOCK_REALTIME timespec)))
     (cond
@@ -473,3 +655,28 @@
                                      tv_nsec-type
                                      (c-type-size tv_sec-type))
                    (c-bytevector-ref timespec tv_sec-type 0))))))
+
+;;> Returns the current time as a time object of type time-monotonic, which
+;;> represents the time since an arbitrary epoch. This epoch is arbitrary,
+;;> but cannot change after the current program begins to run. It is
+;;> guaranteed that a call to monotonic-time cannot return a time earlier
+;;> than a previous call to monotonic-time. This is not guaranteed for
+;;> posix-time because the system's POSIX clock is sometimes turned backward
+;;> to correct local clock drift. It uses the POSIX CLOCK_MONOTONIC clock.
+(define (monotonic-time)
+  (let* ((result (c-clock-gettime CLOCK_MONOTONIC timespec)))
+    (cond
+      ((< result 0)
+       (let* ((error-message "posix-time error")
+              (error-pointer (string->c-bytevector error-message)))
+         (c-perror error-pointer)
+         (c-bytevector-free timespec)
+         (c-bytevector-free error-pointer)
+         (error error-message)))
+      (else
+        (make-time time-utc
+                   (c-bytevector-ref timespec
+                                     tv_nsec-type
+                                     (c-type-size tv_sec-type))
+                   (c-bytevector-ref timespec tv_sec-type 0))))))
+
