@@ -53,6 +53,39 @@
 (define slash (cond-expand (windows "\\") (else "/")))
 (define randomized? #f)
 
+(define (string-split str mark)
+  (let* ((str-l (string->list str))
+         (res (list))
+         (last-index 0)
+         (index 0)
+         (splitter
+           (lambda (c)
+             (cond ((char=? c mark)
+                    (begin
+                      (set! res
+                        (append res
+                                (list (string-copy str last-index index))))
+                      (set! last-index (+ index 1))))
+                   ((equal? (length str-l) (+ index 1))
+                    (set! res
+                      (append res
+                              (list (string-copy str
+                                                 last-index
+                                                 (+ index 1)))))))
+             (set! index (+ index 1)))))
+    (for-each splitter str-l)
+    res))
+
+(define (string-char-replace replace-in replace-this replace-with)
+  (let ((result ""))
+    (string-for-each
+      (lambda (c)
+        (if (char=? c replace-this)
+          (set! result (string-append result replace-with))
+          (set! result (string-append result (string c)))))
+      replace-in)
+    result))
+
 (define (random-to max)
   (when (not randomized?)
     (c-srand (c-time (c-bytevector-null)))
@@ -78,7 +111,21 @@
     (looper "" (random-to 128))))
 
 (define-record-type file-info-record
-  (make-file-info-record device inode mode nlinks uid gid rdev size blksize blocks atime mtime ctime fname/port follow?)
+  (make-file-info-record device
+                         inode
+                         mode
+                         nlinks
+                         uid
+                         gid
+                         rdev
+                         size
+                         blksize
+                         blocks
+                         atime
+                         mtime
+                         ctime
+                         fname/port
+                         follow?)
   file-info?
   (device file-info:device)
   (inode file-info:inode)
@@ -551,12 +598,64 @@
 (define-record-type <user-info>
   (make-user-info name uid gid home-dir shell full-name)
   user-info?
-  (name user-info:name)
-  (uid user-info:uid)
-  (gid user-info:gid)
-  (home-dir user-info:home-dir)
-  (shell user-info:shell)
-  (full-name user-info:full-name))
+  (name internal-user-info:name)
+  (uid internal-user-info:uid)
+  (gid internal-user-info:gid)
+  (home-dir internal-user-info:home-dir)
+  (shell internal-user-info:shell)
+  (full-name internal-user-info:full-name))
+
+;;> Returns the user name stored in user-info respectively.
+;;> An implementation returns #f for any unavailable items.
+(define (user-info:name user-info) (internal-user-info:name user-info))
+;;> Returns the user uid stored in user-info respectively.
+;;> An implementation returns #f for any unavailable items.
+(define (user-info:uid user-info) (internal-user-info:uid user-info))
+;;> Returns the user gid stored in user-info respectively.
+;;> An implementation returns #f for any unavailable items.
+(define (user-info:gid user-info) (internal-user-info:gid user-info))
+;;> Returns the user home directory stored in user-info respectively.
+;;> An implementation returns #f for any unavailable items.
+(define (user-info:home-dir user-info) (internal-user-info:home-dir user-info))
+;;> Returns the shell path stored in user-info respectively.
+;;> An implementation returns #f for any unavailable items.
+(define (user-info:shell user-info) (internal-user-info:shell user-info))
+
+;;> Returns the contents of the pw_gecos field stored in user-info. Although
+;;> this field is not part of POSIX, it has been part of all Unix variants
+;;> since at least the Sixth Edition of Research Unix. It normally contains
+;;> the user's full name, but may contain additional system-specific
+;;> information; on Windows, it contains exactly the full name.
+(define (user-info:full-name user-info)
+  (internal-user-info:full-name user-info))
+
+;;> Returns a parsed and expanded version of the raw string returned by
+;;> user-info:full-name. The raw value is split on commas, creating a list of
+;;> strings to be returned. All ampersands in the first element of the list
+;;> are replaced by user-info:name, which is capitalized if it starts with an
+;;> ASCII lowercase letter.
+
+;;> However, on Windows the implementation is completely different:
+;;> user-info:parsed-full-name returns a list with a single element, the
+;;> result of user-info:full-name. No comma splitting or ampersand
+;;> substitution is performed.
+
+;;> The meaning of the first element of the returned list is the user's full
+;;> name on all known systems. The remaining elements have varying meaning.
+;;> For example, on BSD systems, the second through fourth elements are the
+;;> user's work location, the user's work phone number, and the user's home
+;;> phone number, respectively. On Cygwin, the second element is the Windows
+;;> SID corresponding to this user; further elements depend on Cygwin-specific
+;;> entries in the /etc/nsswitch.conf file.
+(define (user-info:parsed-full-name user-info)
+  (let* ((parsed-list
+           (string-split (internal-user-info:full-name user-info) #\,))
+         (first
+           (string-append
+             (string (char-upcase (string-ref (car parsed-list) 0)))
+             (string-copy (car parsed-list) 1))))
+    (cons (string-char-replace first #\& (user-info:name user-info))
+          (cdr parsed-list))))
 
 ;;> Return a user-info record giving the recorded information for a particular
 ;;> user. The uid/name argument is either an exact integer user id or a string

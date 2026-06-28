@@ -73,7 +73,7 @@
           user-info:home-dir
           user-info:shell
           user-info:full-name
-          ;user-info:parsed-full-name
+          user-info:parsed-full-name
           group-info
           group-info?
           group-info:name
