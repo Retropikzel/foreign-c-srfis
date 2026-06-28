@@ -51,11 +51,10 @@
 (define-c-procedure c-clock-gettime libc 'clock_gettime 'int '(int pointer))
 (define-c-procedure c-nice libc 'nice 'int '(int))
 (define-c-procedure c-umask libc 'umask 'uint '(int))
-(define-c-procedure c-utimensat
-                    libc
-                    'utimensat
-                    'int
-                    '(int pointer pointer int))
+(define-c-procedure
+  c-utimensat libc 'utimensat 'int '(int pointer pointer int))
+(define-c-procedure c-truncate libc 'truncate 'int '(pointer int))
+(define-c-procedure c-statvfs libc 'statvfs 'int '(pointer pointer))
 
 (define slash (cond-expand (windows "\\") (else "/")))
 (define randomized? #f)
@@ -343,11 +342,33 @@
       timespecs-cbv timespec-array 2 (time-second modify-time-object))
     (c-bytevector-set!
       timespecs-cbv timespec-array 3 (time-nanosecond modify-time-object))
-    (c-utimensat current-dir-fd fname-cbv timespecs-cbv 0)
-    (c-bytevector-free fname-cbv)
-    (c-bytevector-free timespecs-cbv)
-    (c-bytevector-free current-dir-cbv)
-    (c-bytevector-free current-dir-stream)))
+    (let ((result (c-utimensat current-dir-fd fname-cbv timespecs-cbv 0)))
+      (c-bytevector-free fname-cbv)
+      (c-bytevector-free timespecs-cbv)
+      (c-bytevector-free current-dir-cbv)
+      (c-bytevector-free current-dir-stream)
+      (when (< result 0)
+        (let* ((error-message "set-file-times error")
+               (error-pointer (string->c-bytevector error-message)))
+          (c-perror error-pointer)
+          (c-bytevector-free error-pointer)
+          (error error-message))))))
+
+;;> The specified file is truncated to len bytes in length.
+(define (truncate-file fname/port len)
+  (when (not (exact-integer? len))
+    (error "truncate-file error: len must be exact-integer"))
+  (when (not (string? fname/port))
+    (error "truncate-file error: ports not supported yet"))
+  (let* ((fname/port-cbv (string->c-bytevector fname/port))
+         (result (c-truncate fname/port-cbv len)))
+    (c-bytevector-free fname/port-cbv)
+    (when (< result 0)
+      (let* ((error-message "truncate-file error")
+             (error-pointer (string->c-bytevector error-message)))
+        (c-perror error-pointer)
+        (c-bytevector-free error-pointer)
+        (error error-message)))))
 
 (define (pointer-string-read pointer offset)
   (letrec* ((looper (lambda (c index result)

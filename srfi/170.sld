@@ -21,7 +21,7 @@
           delete-directory
           set-file-owner
           set-file-times
-          ;truncate-file
+          truncate-file
           file-info
           file-info?
           ;file-info:device
