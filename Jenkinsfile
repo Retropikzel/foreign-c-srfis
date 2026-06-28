@@ -60,7 +60,7 @@ pipeline {
                         env.R7RS_SCHEMES.split().each { SCHEME ->
                             stage("${SCHEME} ${SRFI}") {
                                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs test-docker"
+                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r7rs test-docker"
                                 }
                             }
                         }

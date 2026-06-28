@@ -56,6 +56,7 @@ test-docker: testfiles
 	cd .tmp && \
 		DOCKER_TAG=${DOCKER_TAG} \
 		SNOW_PACKAGES="srfi.64 ${PKG}" \
+		AKKU_PACKAGES="akku-r7rs chez-srfi" \
 		APT_PACKAGES="libcurl4-openssl-dev" \
 		COMPILE_R7RS=${SCHEME} \
 		TEST_R7RS_DEBUG=1 \
