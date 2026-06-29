@@ -4,6 +4,7 @@
                     "string.h"
                     "dirent.h"
                     "sys/stat.h"
+                    "sys/statvfs.h"
                     "sys/types.h"
                     "unistd.h"
                     "pwd.h"
@@ -155,6 +156,21 @@
     (cond ((> handle 0) (c-close handle) #f)
           (else #t))))
 
+(define-c-struct-type timespec-struct '((tv_sec long) (tv_nsec long)))
+(define-c-struct-type stat-struct
+                      '((st_dev int)
+                        (st_ino uint)
+                        (st_mode uint)
+                        (st_nlink int)
+                        (st_uid uint)
+                        (st_gid uint)
+                        (st_rdev int)
+                        (st_size int)
+                        (st_blksize int)
+                        (st_blocks int)
+                        (st_atim timespec-struct)
+                        (st_mtim timespec-struct)
+                        (st_ctim timespec-struct)))
 ;;> The file-info procedure returns a file-info record containing useful
 ;;> information about a file. If the follow? flag is true the procedure will
 ;;> follow symlinks and report on the file to which they refer. If follow? is
@@ -164,7 +180,7 @@
   (when (port? fname/port)
     (error "file-info implementation does not support ports as arguments"))
   (let* ((fname-pointer (string->c-bytevector fname/port))
-         (stat-pointer (make-c-bytevector 256))
+         (stat-pointer (make-c-bytevector (c-type-size stat-struct)))
          (result (if follow?
                    (c-stat fname-pointer stat-pointer)
                    (c-lstat fname-pointer stat-pointer)))
