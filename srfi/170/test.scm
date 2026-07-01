@@ -11,6 +11,8 @@
 (test-assert (> niceness 0))
 
 (define fi (file-info "/tmp" #f))
+(write fi)
+(newline)
 (write (file-info-directory? fi))
 (newline)
 

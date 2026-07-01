@@ -117,22 +117,22 @@
                              (random-to 128)))))))))
     (looper "" (random-to 128))))
 
-(define-record-type file-info-record
-  (make-file-info-record device
-                         inode
-                         mode
-                         nlinks
-                         uid
-                         gid
-                         rdev
-                         size
-                         blksize
-                         blocks
-                         atime
-                         mtime
-                         ctime
-                         fname/port
-                         follow?)
+(define-record-type <file-info>
+  (make-file-info device
+                  inode
+                  mode
+                  nlinks
+                  uid
+                  gid
+                  rdev
+                  size
+                  blksize
+                  blocks
+                  atime
+                  mtime
+                  ctime
+                  fname/port
+                  follow?)
   file-info?
   (device file-info:device)
   (inode file-info:inode)
@@ -156,9 +156,8 @@
     (cond ((> handle 0) (c-close handle) #f)
           (else #t))))
 
-(define-c-struct-type timespec-struct '((tv_sec long) (tv_nsec long)))
 (define-c-struct-type stat-struct
-                      '((st_dev int)
+                      `((st_dev int)
                         (st_ino uint)
                         (st_mode uint)
                         (st_nlink int)
@@ -168,9 +167,12 @@
                         (st_size int)
                         (st_blksize int)
                         (st_blocks int)
-                        (st_atim timespec-struct)
-                        (st_mtim timespec-struct)
-                        (st_ctim timespec-struct)))
+                        (st_atim-tv_sec long)
+                        (st_atim-tv_nsec long)
+                        (st_mtim-tv_sec long)
+                        (st_mtim-tv_nsec long)
+                        (st_ctim-tv_sec long)
+                        (st_ctim-tv_nsec long)))
 ;;> The file-info procedure returns a file-info record containing useful
 ;;> information about a file. If the follow? flag is true the procedure will
 ;;> follow symlinks and report on the file to which they refer. If follow? is
@@ -192,21 +194,28 @@
       (c-bytevector-free stat-pointer)
       (c-bytevector-free error-pointer)
       (error error-message fname/port))
-    (make-file-info-record #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 0) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 1) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 2) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 3) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 4) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 5) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 6) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 7) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 8) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 9) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 10) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 11) (native-endianness))
-                           #f ;(c-bytevector-u64-ref stat-pointer (* (c-type-size 'uint64) 12) (native-endianness))
-                           fname/port
-                           follow?)))
+    (make-file-info
+      (c-bytevector-ref stat-pointer stat-struct 'st_dev)
+      (c-bytevector-ref stat-pointer stat-struct 'st_ino)
+      (c-bytevector-ref stat-pointer stat-struct 'st_mode)
+      (c-bytevector-ref stat-pointer stat-struct 'st_nlink)
+      (c-bytevector-ref stat-pointer stat-struct 'st_uid)
+      (c-bytevector-ref stat-pointer stat-struct 'st_gid)
+      (c-bytevector-ref stat-pointer stat-struct 'st_rdev)
+      (c-bytevector-ref stat-pointer stat-struct 'st_size)
+      (c-bytevector-ref stat-pointer stat-struct 'st_blksize)
+      (c-bytevector-ref stat-pointer stat-struct 'st_blocks)
+      (make-time time-utc
+                 (c-bytevector-ref stat-pointer stat-struct 'st_atim-tv_sec)
+                 (c-bytevector-ref stat-pointer stat-struct 'st_atim-tv_nsec))
+      (make-time time-utc
+                 (c-bytevector-ref stat-pointer stat-struct 'st_mtim-tv_sec)
+                 (c-bytevector-ref stat-pointer stat-struct 'st_mtim-tv_nsec))
+      (make-time time-utc
+                 (c-bytevector-ref stat-pointer stat-struct 'st_ctim-tv_sec)
+                 (c-bytevector-ref stat-pointer stat-struct 'st_ctim-tv_nsec))
+      fname/port
+      follow?)))
 ;;> The permission-bits for create-directory default to #o775 but are masked
 ;;> by the current umask.
 (define create-directory
