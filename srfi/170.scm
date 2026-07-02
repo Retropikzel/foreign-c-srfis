@@ -167,12 +167,12 @@
                         (st_size int)
                         (st_blksize int)
                         (st_blocks int)
-                        (st_atim-tv_sec long)
-                        (st_atim-tv_nsec long)
-                        (st_mtim-tv_sec long)
-                        (st_mtim-tv_nsec long)
-                        (st_ctim-tv_sec long)
-                        (st_ctim-tv_nsec long)))
+                        (st_atim.tv_sec long)
+                        (st_atim.tv_nsec long)
+                        (st_mtim.tv_sec long)
+                        (st_mtim.tv_nsec long)
+                        (st_ctim.tv_sec long)
+                        (st_ctim.tv_nsec long)))
 ;;> The file-info procedure returns a file-info record containing useful
 ;;> information about a file. If the follow? flag is true the procedure will
 ;;> follow symlinks and report on the file to which they refer. If follow? is
@@ -185,37 +185,40 @@
          (stat-pointer (make-c-bytevector (c-type-size stat-struct)))
          (result (if follow?
                    (c-stat fname-pointer stat-pointer)
-                   (c-lstat fname-pointer stat-pointer)))
-         (error-message "file-info error")
-         (error-pointer (string->c-bytevector error-message)))
+                   (c-lstat fname-pointer stat-pointer))))
     (when (< result 0)
-      (c-perror error-pointer)
+      (let* ((error-message "file-info error")
+             (error-pointer (string->c-bytevector error-message)))
+        (c-perror error-pointer)
+        (c-bytevector-free fname-pointer)
+        (c-bytevector-free stat-pointer)
+        (c-bytevector-free error-pointer)
+        (error error-message fname/port)))
+    (let ((fi (make-file-info
+                (c-bytevector-ref stat-pointer stat-struct 'st_dev)
+                (c-bytevector-ref stat-pointer stat-struct 'st_ino)
+                (c-bytevector-ref stat-pointer stat-struct 'st_mode)
+                (c-bytevector-ref stat-pointer stat-struct 'st_nlink)
+                (c-bytevector-ref stat-pointer stat-struct 'st_uid)
+                (c-bytevector-ref stat-pointer stat-struct 'st_gid)
+                (c-bytevector-ref stat-pointer stat-struct 'st_rdev)
+                (c-bytevector-ref stat-pointer stat-struct 'st_size)
+                (c-bytevector-ref stat-pointer stat-struct 'st_blksize)
+                (c-bytevector-ref stat-pointer stat-struct 'st_blocks)
+                (make-time time-utc
+                           (c-bytevector-ref stat-pointer stat-struct 'st_atim.tv_sec)
+                           (c-bytevector-ref stat-pointer stat-struct 'st_atim.tv_nsec))
+                (make-time time-utc
+                           (c-bytevector-ref stat-pointer stat-struct 'st_mtim.tv_sec)
+                           (c-bytevector-ref stat-pointer stat-struct 'st_mtim.tv_nsec))
+                (make-time time-utc
+                           (c-bytevector-ref stat-pointer stat-struct 'st_ctim.tv_sec)
+                           (c-bytevector-ref stat-pointer stat-struct 'st_ctim.tv_nsec))
+                fname/port
+                follow?)))
       (c-bytevector-free fname-pointer)
       (c-bytevector-free stat-pointer)
-      (c-bytevector-free error-pointer)
-      (error error-message fname/port))
-    (make-file-info
-      (c-bytevector-ref stat-pointer stat-struct 'st_dev)
-      (c-bytevector-ref stat-pointer stat-struct 'st_ino)
-      (c-bytevector-ref stat-pointer stat-struct 'st_mode)
-      (c-bytevector-ref stat-pointer stat-struct 'st_nlink)
-      (c-bytevector-ref stat-pointer stat-struct 'st_uid)
-      (c-bytevector-ref stat-pointer stat-struct 'st_gid)
-      (c-bytevector-ref stat-pointer stat-struct 'st_rdev)
-      (c-bytevector-ref stat-pointer stat-struct 'st_size)
-      (c-bytevector-ref stat-pointer stat-struct 'st_blksize)
-      (c-bytevector-ref stat-pointer stat-struct 'st_blocks)
-      (make-time time-utc
-                 (c-bytevector-ref stat-pointer stat-struct 'st_atim-tv_sec)
-                 (c-bytevector-ref stat-pointer stat-struct 'st_atim-tv_nsec))
-      (make-time time-utc
-                 (c-bytevector-ref stat-pointer stat-struct 'st_mtim-tv_sec)
-                 (c-bytevector-ref stat-pointer stat-struct 'st_mtim-tv_nsec))
-      (make-time time-utc
-                 (c-bytevector-ref stat-pointer stat-struct 'st_ctim-tv_sec)
-                 (c-bytevector-ref stat-pointer stat-struct 'st_ctim-tv_nsec))
-      fname/port
-      follow?)))
+      fi)))
 ;;> The permission-bits for create-directory default to #o775 but are masked
 ;;> by the current umask.
 (define create-directory

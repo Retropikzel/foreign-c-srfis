@@ -13,7 +13,7 @@
 (define fi (file-info "/tmp" #f))
 (write fi)
 (newline)
-(write (file-info-directory? fi))
+(write (file-info:mode fi))
 (newline)
 
 
