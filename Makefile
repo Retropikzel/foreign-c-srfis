@@ -2,6 +2,7 @@ SCHEME=chibi
 RNRS=r7rs
 SRFI=170
 AUTHOR=Retropikzel
+DOCKER_TAG=latest
 
 SRFI_FILE=srfi/${SRFI}.sld
 VERSION=$(shell cat srfi/${SRFI}/VERSION)
@@ -19,7 +20,19 @@ SFX=sps
 AKKU_PACKAGES="akku-r7rs"
 endif
 
+ifeq "${SCHEME}" "capyscheme"
 DOCKER_TAG=head
+endif
+ifeq "${SCHEME}" "chibi"
+DOCKER_TAG=head
+endif
+ifeq "${SCHEME}" "chicken"
+DOCKER_TAG=head
+endif
+ifeq "${SCHEME}" "gauche"
+DOCKER_TAG=head
+endif
+
 
 all: package
 
