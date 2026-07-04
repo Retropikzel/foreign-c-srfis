@@ -32,29 +32,33 @@ pipeline {
     }
 
     stages {
-        stage('R6RS Debian') {
-            steps {
-                script {
-                    env.SRFIS.split().each { SRFI ->
-                        env.R6RS_SCHEMES.split().each { SCHEME ->
-                            stage("${SCHEME} ${SRFI}") {
-                                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs test-docker"
+        stage('Parallel') {
+            parallel {
+                stage('R6RS Debian') {
+                    steps {
+                        script {
+                            env.SRFIS.split().each { SRFI ->
+                                env.R6RS_SCHEMES.split().each { SCHEME ->
+                                    stage("${SCHEME} ${SRFI}") {
+                                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                                            sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r6rs test-docker"
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        stage('R7RS Debian') {
-            steps {
-                script {
-                    env.SRFIS.split().each { SRFI ->
-                        env.R7RS_SCHEMES.split().each { SCHEME ->
-                            stage("${SCHEME} ${SRFI}") {
-                                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                                    sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r7rs test-docker"
+                stage('R7RS Debian') {
+                    steps {
+                        script {
+                            env.SRFIS.split().each { SRFI ->
+                                env.R7RS_SCHEMES.split().each { SCHEME ->
+                                    stage("${SCHEME} ${SRFI}") {
+                                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                                            sh "make SCHEME=${SCHEME} SRFI=${SRFI} RNRS=r7rs test-docker"
+                                        }
+                                    }
                                 }
                             }
                         }
