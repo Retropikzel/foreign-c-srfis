@@ -1,5 +1,5 @@
-FROM debian:trixie
-RUN apt-get update && apt-get -y install build-essential libffi-dev docker.io git
-RUN git clone https://github.com/ashinn/chibi-scheme.git --depth=1
-RUN cd chibi-scheme && make && make install
-RUN snow-chibi install --impls=chibi --always-yes retropikzel.test-r7rs
+FROM schemers/chibi:head
+RUN apt-get update && apt-get install -y \
+    gcc ca-certificates libffi-dev docker.io make
+ARG timestamp=0
+RUN snow-chibi install --impls=chibi retropikzel.test-r7rs && echo "$timestamp"
