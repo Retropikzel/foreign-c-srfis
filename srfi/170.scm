@@ -151,10 +151,14 @@
   (follow? file-info:follow?))
 
 (define (file-info-directory? file-info)
-  (let ((handle (c-open (string->c-bytevector
-                          (file-info:fname/port file-info)) 2)))
-    (cond ((> handle 0) (c-close handle) #f)
-          (else #t))))
+  (let* ((file-info:fname/port*
+           (string->c-bytevector (file-info:fname/port file-info)))
+         (handle (c-open file-info:fname/port 2))
+         (result
+           (cond ((> handle 0) (c-close handle) #f)
+                 (else #t))))
+    (c-bytevector-free file-info:fname/port*)
+    result))
 
 (define-c-struct-type stat-struct
                       `((st_dev int)
@@ -252,8 +256,10 @@
     (c-bytevector-free error-pointer)))
 
 (define (create-hard-link old-fname new-fname)
-  (c-link (string->c-bytevector old-fname)
-          (string->c-bytevector new-fname)))
+  (let ((old-fname* (string->c-bytevector old-fname))
+        (new-fname* (string->c-bytevector new-fname)))
+  (c-link old-fname* new-fname*)
+  (c-bytevector-free old-fname* new-fname*)))
 
 (define (create-symlink old-fname new-fname)
   (c-slink (string->c-bytevector old-fname)
@@ -531,8 +537,7 @@
                  (append result
                          (list (c-bytevector-ref groups-pointer
                                                  'int
-                                                 (* (c-type-size 'int) count)
-                                                 ))))))
+                                                 (* (c-type-size 'int) count)))))))
 
 (define (user-supplementary-gids)
   (let* ((group-count (c-getgroups 0 (c-bytevector-null)))
