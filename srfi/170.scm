@@ -85,12 +85,13 @@
 
 (define (string-char-replace replace-in replace-this replace-with)
   (let ((result ""))
-    (string-for-each
-      (lambda (c)
-        (if (char=? c replace-this)
-          (set! result (string-append result replace-with))
-          (set! result (string-append result (string c)))))
-      replace-in)
+    (list->string
+      (for-each
+        (lambda (c)
+          (if (char=? c replace-this)
+            (set! result (string-append result replace-with))
+            (set! result (string-append result (string c)))))
+        (string->list replace-in)))
     result))
 
 (define (random-to max)
@@ -151,9 +152,12 @@
   (follow? file-info:follow?))
 
 (define (file-info-directory? file-info)
+  (when (not (file-info? file-info))
+    (error "file-info-directory? error: file-info must be <file-info> record"
+           file-info))
   (let* ((file-info:fname/port*
            (string->c-bytevector (file-info:fname/port file-info)))
-         (handle (c-open file-info:fname/port 2))
+         (handle (c-open file-info:fname/port* 2))
          (result
            (cond ((> handle 0) (c-close handle) #f)
                  (else #t))))
@@ -180,80 +184,78 @@
 (define (file-info fname/port follow?)
   (when (port? fname/port)
     (error "file-info implementation does not support ports as arguments"))
-  (let* ((fname-pointer (string->c-bytevector fname/port))
-         (stat-pointer (make-c-bytevector (c-type-size stat-struct)))
+  (let* ((fname* (string->c-bytevector fname/port))
+         (stat* (make-c-bytevector (c-type-size stat-struct)))
          (result (if follow?
-                   (c-stat fname-pointer stat-pointer)
-                   (c-lstat fname-pointer stat-pointer))))
+                   (c-stat fname* stat*)
+                   (c-lstat fname* stat*))))
     (when (< result 0)
       (let* ((error-message "file-info error")
-             (error-pointer (string->c-bytevector error-message)))
-        (c-perror error-pointer)
-        (c-bytevector-free fname-pointer)
-        (c-bytevector-free stat-pointer)
-        (c-bytevector-free error-pointer)
+             (error-msg* (string->c-bytevector error-message)))
+        (c-perror error-msg*)
+        (c-bytevector-free fname* stat* error-msg*)
         (error error-message fname/port)))
-    (let ((fi (make-file-info
-                (c-bytevector-ref stat-pointer stat-struct 'st_dev)
-                (c-bytevector-ref stat-pointer stat-struct 'st_ino)
-                (c-bytevector-ref stat-pointer stat-struct 'st_mode)
-                (c-bytevector-ref stat-pointer stat-struct 'st_nlink)
-                (c-bytevector-ref stat-pointer stat-struct 'st_uid)
-                (c-bytevector-ref stat-pointer stat-struct 'st_gid)
-                (c-bytevector-ref stat-pointer stat-struct 'st_rdev)
-                (c-bytevector-ref stat-pointer stat-struct 'st_size)
-                (c-bytevector-ref stat-pointer stat-struct 'st_blksize)
-                (c-bytevector-ref stat-pointer stat-struct 'st_blocks)
+    (let ((file-info (make-file-info
+                (c-bytevector-ref stat* stat-struct 'st_dev)
+                (c-bytevector-ref stat* stat-struct 'st_ino)
+                (c-bytevector-ref stat* stat-struct 'st_mode)
+                (c-bytevector-ref stat* stat-struct 'st_nlink)
+                (c-bytevector-ref stat* stat-struct 'st_uid)
+                (c-bytevector-ref stat* stat-struct 'st_gid)
+                (c-bytevector-ref stat* stat-struct 'st_rdev)
+                (c-bytevector-ref stat* stat-struct 'st_size)
+                (c-bytevector-ref stat* stat-struct 'st_blksize)
+                (c-bytevector-ref stat* stat-struct 'st_blocks)
                 (make-time time-utc
-                           (c-bytevector-ref stat-pointer stat-struct 'st_atim.tv_sec)
-                           (c-bytevector-ref stat-pointer stat-struct 'st_atim.tv_nsec))
+                           (c-bytevector-ref stat* stat-struct 'st_atim.tv_sec)
+                           (c-bytevector-ref stat* stat-struct 'st_atim.tv_nsec))
                 (make-time time-utc
-                           (c-bytevector-ref stat-pointer stat-struct 'st_mtim.tv_sec)
-                           (c-bytevector-ref stat-pointer stat-struct 'st_mtim.tv_nsec))
+                           (c-bytevector-ref stat* stat-struct 'st_mtim.tv_sec)
+                           (c-bytevector-ref stat* stat-struct 'st_mtim.tv_nsec))
                 (make-time time-utc
-                           (c-bytevector-ref stat-pointer stat-struct 'st_ctim.tv_sec)
-                           (c-bytevector-ref stat-pointer stat-struct 'st_ctim.tv_nsec))
+                           (c-bytevector-ref stat* stat-struct 'st_ctim.tv_sec)
+                           (c-bytevector-ref stat* stat-struct 'st_ctim.tv_nsec))
                 fname/port
                 follow?)))
-      (c-bytevector-free fname-pointer)
-      (c-bytevector-free stat-pointer)
-      fi)))
+      (c-bytevector-free fname* stat*)
+      file-info)))
+
 (define create-directory
   (lambda (fname . permission-bits)
-    (let* ((fname-pointer (string->c-bytevector fname))
+    (let* ((fname* (string->c-bytevector fname))
            (mode (if (null? permission-bits)
                    #o775
                    (string->number
                      (string-append
                        "#o"
                        (number->string (car permission-bits))))))
-           (result (c-mkdir fname-pointer mode))
+           (result (c-mkdir fname* mode))
            (error-message "create-directory error")
-           (error-pointer (string->c-bytevector error-message)))
-      (c-bytevector-free fname-pointer)
+           (error-msg* (string->c-bytevector error-message)))
+      (c-bytevector-free fname*)
       (when (< result 0)
-        (c-perror error-pointer)
-        (c-bytevector-free error-pointer)
+        (c-perror error-msg*)
+        (c-bytevector-free error-msg*)
         (error error-message))
-      (c-bytevector-free error-pointer))))
+      (c-bytevector-free error-msg*))))
 
 (define (create-fifo fname . permission-bits)
-  (let* ((fname-pointer (string->c-bytevector fname))
+  (let* ((fname* (string->c-bytevector fname))
          (mode (if (null? permission-bits)
                  #o664
                  (string->number
                    (string-append
                      "#o"
                      (number->string (car permission-bits))))))
-         (result (c-mkfifo fname-pointer mode))
+         (result (c-mkfifo fname* mode))
          (error-message "create-fifo error")
-         (error-pointer (string->c-bytevector error-message)))
-    (c-bytevector-free fname-pointer)
+         (error-msg* (string->c-bytevector error-message)))
+    (c-bytevector-free fname*)
     (when (< result 0)
-      (c-perror error-pointer)
-      (c-bytevector-free error-pointer)
+      (c-perror error-msg*)
+      (c-bytevector-free error-msg*)
       (error error-message))
-    (c-bytevector-free error-pointer)))
+    (c-bytevector-free error-msg*)))
 
 (define (create-hard-link old-fname new-fname)
   (let ((old-fname* (string->c-bytevector old-fname))
@@ -266,23 +268,23 @@
            (string->c-bytevector new-fname)))
 
 (define (internal-read-symlink fname buffer-length)
-  (let* ((path-pointer (string->c-bytevector fname))
+  (let* ((path* (string->c-bytevector fname))
          (buffer (make-c-bytevector buffer-length))
-         (result (c-readlink path-pointer buffer (- buffer-length 1)))
+         (result (c-readlink path* buffer (- buffer-length 1)))
          (error-message "read-symlink error")
-         (error-pointer (string->c-bytevector error-message)))
+         (error-msg* (string->c-bytevector error-message)))
     (cond ((< result 0)
-           (c-perror error-pointer)
-           (c-bytevector-free error-pointer)
+           (c-perror error-msg*)
+           (c-bytevector-free error-msg*)
            (error error-message))
           ((> result buffer-length)
-           (c-bytevector-free path-pointer)
+           (c-bytevector-free path*)
            (c-bytevector-free buffer)
            (internal-read-symlink fname (+ buffer-length buffer-length)))
           (else
             (c-bytevector-set! buffer 'u8 result null-byte)
             (let ((name (c-bytevector->string buffer)))
-              (c-bytevector-free path-pointer)
+              (c-bytevector-free path*)
               (c-bytevector-free buffer)
               name)))))
 
@@ -293,20 +295,20 @@
             (string->c-bytevector new-fname)))
 
 (define (delete-directory fname)
-  (let* ((fname-pointer (string->c-bytevector fname))
-         (result (c-rmdir fname-pointer)))
-    (c-bytevector-free fname-pointer)
+  (let* ((fname* (string->c-bytevector fname))
+         (result (c-rmdir fname*)))
+    (c-bytevector-free fname*)
     (when (< result 0)
       (let* ((error-message "delete-directory error")
-             (error-pointer (string->c-bytevector error-message)))
-        (c-perror error-pointer)
-        (c-bytevector-free error-pointer)
+             (error-msg* (string->c-bytevector error-message)))
+        (c-perror error-msg*)
+        (c-bytevector-free error-msg*)
         (error error-message)))))
 
 (define (set-file-owner fname uid gid)
-  (let ((fname-pointer (string->c-bytevector fname)))
-    (c-chown fname-pointer uid gid)
-    (c-bytevector-free fname-pointer)))
+  (let ((fname* (string->c-bytevector fname)))
+    (c-chown fname* uid gid)
+    (c-bytevector-free fname*)))
 
 (define-c-array-type timespec-array 'long)
 (define (set-file-times fname . args)
@@ -340,9 +342,9 @@
       (c-bytevector-free fname-cbv timespecs-cbv current-dir-cbv current-dir-stream)
       (when (< result 0)
         (let* ((error-message "set-file-times error")
-               (error-pointer (string->c-bytevector error-message)))
-          (c-perror error-pointer)
-          (c-bytevector-free error-pointer)
+               (error-msg*(string->c-bytevector error-message)))
+          (c-perror error-msg*)
+          (c-bytevector-free error-msg*)
           (error error-message))))))
 
 (define (truncate-file fname/port len)
@@ -355,9 +357,9 @@
     (c-bytevector-free fname/port-cbv)
     (when (< result 0)
       (let* ((error-message "truncate-file error")
-             (error-pointer (string->c-bytevector error-message)))
-        (c-perror error-pointer)
-        (c-bytevector-free error-pointer)
+             (error-msg* (string->c-bytevector error-message)))
+        (c-perror error-msg*)
+        (c-bytevector-free error-msg*)
         (error error-message)))))
 
 (define (pointer-string-read pointer offset)
@@ -377,17 +379,17 @@
 (define directory-files
   (lambda (dir . dotfiles?)
     (letrec* ((include-dotfiles? (if (null? dotfiles?) #f (car dotfiles?)))
-              (path-pointer (string->c-bytevector dir))
-              (directory-pointer (c-opendir path-pointer))
+              (path* (string->c-bytevector dir))
+              (directory* (c-opendir path*))
               (error-message "directory-files error")
-              (error-pointer (string->c-bytevector error-message))
+              (error-msg* (string->c-bytevector error-message))
               (dotfile? (lambda (name) (char=? (string-ref name 0) #\.)))
               (looper (lambda (directory-entity files)
                         (if (c-bytevector-null? directory-entity)
                           files
                           (let ((name (pointer-string-read directory-entity
                                                            d-name-offset)))
-                            (looper (c-readdir directory-pointer)
+                            (looper (c-readdir directory*)
                                     (cond ((string=? name ".") files)
                                           ((string=? name "..") files)
                                           ((and include-dotfiles?
@@ -396,17 +398,17 @@
                                           ((not (dotfile? name))
                                            (cons name files))
                                           (else files))))))))
-      (when (c-bytevector-null? directory-pointer)
-        (c-perror error-pointer)
-        ;(c-bytevector-free error-pointer)
-        ;(c-bytevector-free directory)
-        ;(c-bytevector-free path-pointer)
+      (when (c-bytevector-null? directory*)
+        (c-perror error-msg*)
+        ;(c-bytevector-free error-msg*)
+        ;(c-bytevector-free directory*)
+        ;(c-bytevector-free path*)
         (error error-message))
-      (let ((files (looper (c-readdir directory-pointer) (list))))
-        ;(c-bytevector-free error-pointer)
-        ;(c-bytevector-free directory-pointer)
-        ;(c-bytevector-free path-pointer)
-        (c-closedir directory-pointer)
+      (let ((files (looper (c-readdir directory*) (list))))
+        ;(c-bytevector-free error-msg*)
+        ;(c-bytevector-free directory*)
+        ;(c-bytevector-free path*)
+        (c-closedir directory*)
         files))))
 
 (define (set-file-mode path mode)
@@ -445,11 +447,11 @@
 
 (define real-path
   (lambda (path)
-    (let* ((path-pointer (string->c-bytevector path))
-           (real-path-pointer (c-realpath path-pointer (c-bytevector-null)))
-           (real-path (string-copy (c-bytevector->string real-path-pointer))))
-      (c-bytevector-free path-pointer)
-      (c-bytevector-free real-path-pointer)
+    (let* ((path* (string->c-bytevector path))
+           (real-path* (c-realpath path* (c-bytevector-null)))
+           (real-path (string-copy (c-bytevector->string real-path*))))
+      (c-bytevector-free path*)
+      (c-bytevector-free real-path*)
       real-path)))
 
 (define temp-file-prefix
@@ -500,11 +502,11 @@
   (c-umask umask))
 
 (define (current-directory)
-  (let* ((path-pointer (make-c-bytevector 1024))
+  (let* ((path* (make-c-bytevector 1024))
          (path (begin
-                 (c-getcwd path-pointer 1024)
-                 (string-copy (c-bytevector->string path-pointer)))))
-    (c-bytevector-free path-pointer)
+                 (c-getcwd path* 1024)
+                 (string-copy (c-bytevector->string path*)))))
+    (c-bytevector-free path*)
     path))
 
 (define (set-current-directory! path)
@@ -517,10 +519,10 @@
     (let ((result (if (null? args) (c-nice 1) (c-nice (car args)))))
       (when (< result 0)
         (let* ((error-message "nice error")
-               (error-pointer (string->c-bytevector error-message)))
-          (c-perror error-pointer)
+               (error-msg* (string->c-bytevector error-message)))
+          (c-perror error-msg*)
           (c-bytevector-free timespec)
-          (c-bytevector-free error-pointer)
+          (c-bytevector-free error-msg*)
           (error error-message)))
       result)))
 (define (user-uid) (c-getuid))
@@ -528,14 +530,14 @@
 (define (user-effective-uid) (c-geteuid))
 (define (user-effective-gid) (c-getegid))
 
-(define (groups-loop max-count count groups-pointer result)
+(define (groups-loop max-count count groups* result)
   (if (>= count max-count)
     result
     (groups-loop max-count
                  (+ count 1)
-                 groups-pointer
+                 groups*
                  (append result
-                         (list (c-bytevector-ref groups-pointer
+                         (list (c-bytevector-ref groups*
                                                  'int
                                                  (* (c-type-size 'int) count)))))))
 
@@ -577,7 +579,11 @@
 (define (user-info uid/name)
   (let ((password-struct (if (number? uid/name)
                            (c-getpwuid uid/name)
-                           (c-getpwnam (string->c-bytevector uid/name)))))
+                           (let*
+                             ((uid/name* (string->c-bytevector uid/name))
+                              (result (c-getpwnam uid/name*)))
+                             (c-bytevector-free uid/name*)
+                             result))))
     (make-user-info (c-bytevector->string (c-bytevector-ref password-struct
                                                             'pointer
                                                             0))
@@ -623,10 +629,10 @@
     (error "set-environment-variable! error: name must be string"))
   (when (not (string? value))
     (error "set-environment-variable! error: value must be string"))
-  (let ((name-cbv (string->c-bytevector name))
-        (value-cbv (string->c-bytevector value)))
-  (c-setenv name-cbv value-cbv 1)
-  (c-bytevector-free name-cbv value-cbv)))
+  (let ((name* (string->c-bytevector name))
+        (value* (string->c-bytevector value)))
+  (c-setenv name* value* 1)
+  (c-bytevector-free name* value*)))
 
 (define (delete-environment-variable! name)
   (when (not (string? name))
@@ -644,10 +650,10 @@
     (cond
       ((< result 0)
        (let* ((error-message "posix-time error")
-              (error-pointer (string->c-bytevector error-message)))
-         (c-perror error-pointer)
+              (error-msg* (string->c-bytevector error-message)))
+         (c-perror error-msg*)
          (c-bytevector-free timespec)
-         (c-bytevector-free error-pointer)
+         (c-bytevector-free error-msg*)
          (error error-message)))
       (else
         (make-time time-utc
@@ -661,10 +667,10 @@
     (cond
       ((< result 0)
        (let* ((error-message "posix-time error")
-              (error-pointer (string->c-bytevector error-message)))
-         (c-perror error-pointer)
+              (error-msg* (string->c-bytevector error-message)))
+         (c-perror error-msg*)
          (c-bytevector-free timespec)
-         (c-bytevector-free error-pointer)
+         (c-bytevector-free error-msg*)
          (error error-message)))
       (else
         (make-time time-utc
