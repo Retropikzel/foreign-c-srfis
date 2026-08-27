@@ -5,4 +5,5 @@ venv
 foreign
 run-test*
 .*
-
+test-program
+*.link

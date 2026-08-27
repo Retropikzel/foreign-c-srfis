@@ -186,9 +186,7 @@
     (error "file-info implementation does not support ports as arguments"))
   (let* ((fname* (string->c-bytevector fname/port))
          (stat* (make-c-bytevector (c-type-size stat-struct)))
-         (result (if follow?
-                   (c-stat fname* stat*)
-                   (c-lstat fname* stat*))))
+         (result (if follow? (c-stat fname* stat*) (c-lstat fname* stat*))))
     (when (< result 0)
       (let* ((error-message "file-info error")
              (error-msg* (string->c-bytevector error-message)))
@@ -291,8 +289,10 @@
 (define (read-symlink fname) (internal-read-symlink fname 128))
 
 (define (rename-file old-fname new-fname)
-  (c-rename (string->c-bytevector old-fname)
-            (string->c-bytevector new-fname)))
+  (let* ((old-fname* (string->c-bytevector old-fname))
+         (new-fname* (string->c-bytevector new-fname)))
+  (c-rename old-fname* new-fname*)
+  (c-bytevector-free old-fname* new-fname*)))
 
 (define (delete-directory fname)
   (let* ((fname* (string->c-bytevector fname))

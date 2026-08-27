@@ -1,7 +1,27 @@
-To install SRFI library run
+# (foreign c) SRFis
+
+SRFIs made using [(foreign c)](https://codeberg.org/foreign-c/foreign-c) library.
+
+
+## SRFI-106: Basic socket interface
+
+Prioritazing TCP client sockets.
+
+## SRFI-170: POSIX API
+
+
+## Installation
+
+To install published SRFI run:
+
+    snow-fort install --impls=chibi srfi.N
+
+
+To install SRFI from this repository run:
 
     make SCHEME=chibi SRFI=106 build install
 
 
-Change chibi to any other implementation supported by snow-chibi, and 106
-to any filename without suffix in srfi/*.sld
+## Usage
+
+Import and use.

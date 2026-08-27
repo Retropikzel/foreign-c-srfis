@@ -1,80 +1,44 @@
+.POSIX:
+.DEFAULT: all
 SCHEME=chibi
-RNRS=r7rs
 SRFI=170
-AUTHOR=Retropikzel
-DOCKER_TAG=latest
-
-SRFI_FILE=srfi/${SRFI}.sld
-VERSION=$(shell cat srfi/${SRFI}/VERSION)
-DESCRIPTION=$(shell head -n1 srfi/${SRFI}/README.md)
-README=srfi/${SRFI}/README.html
-TESTFILE=srfi/${SRFI}/test.scm
-TMPDIR=.tmp/${SCHEME}
-
 PKG=srfi-${SRFI}-${VERSION}.tgz
-
-SFX=scm
-AKKU_PACKAGES=
-ifeq "${RNRS}" "r6rs"
-SFX=sps
-AKKU_PACKAGES="akku-r7rs"
-endif
-
-ifeq "${SCHEME}" "capyscheme"
-DOCKER_TAG=head
-endif
-ifeq "${SCHEME}" "chibi"
-DOCKER_TAG=head
-endif
-ifeq "${SCHEME}" "chicken"
-DOCKER_TAG=head
-endif
-ifeq "${SCHEME}" "gauche"
-DOCKER_TAG=head
-endif
-
+VERSION=$$(cat srfi/${SRFI}/VERSION)
 
 all: package
 
 package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
-	echo "<pre>$$(cat README.md)</pre>" > README.html
+	cp srfi/${SRFI}/index.html index.html
+	cp srfi/${SRFI}/test.scm test.scm
 	snow-chibi package \
-		--version=${VERSION} \
-		--authors=${AUTHOR} \
-		--doc=${README} \
-		--description="${DESCRIPTION}" \
-		${SRFI_FILE}
+		--license="$$(cat srfi/${SRFI}/LICENSE)" \
+		--version="${VERSION}" \
+		--authors="$$(cat srfi/${SRFI}/AUTHORS 2>/dev/null || echo 'Retropikzel')" \
+		--doc=index.html \
+		--description="$$(cat srfi/${SRFI}/DESCRIPTION)" \
+		srfi/${SRFI}.sld
 
 install:
-	snow-chibi install --impls=${SCHEME} ${PKG}
+	snow-chibi install --impls=${SCHEME} --skip-tests?=1 ${PKG}
 
-${PKG}: package
-
-testfiles: ${PKG}
-	rm -rf .tmp
-	mkdir -p .tmp
-	cp ${PKG} .tmp
-	cp -r srfi .tmp/
-	cat test-headers.${SFX} ${TESTFILE} \
-		| sed 's/SRFI/${SRFI}/' > .tmp/test.${SFX}
-	cat ${TESTFILE} >> run-test.${SFX}
-	if [ "${RNRS}" = "r6rs" ]; \
-		then if [ -d ../foreign-c ]; \
-		then cp -r ../foreign-c/foreign .tmp/; \
-		fi; \
-	fi
-
-test: testfiles
-	cd .tmp && COMPILE_R7RS=${SCHEME} compile-r7rs -o test-program test.${SFX}
-	cd .tmp && ./test-program
+test:
+	cp srfi/${SRFI}/test.scm test.scm
+	COMPILE_R7RS=${SCHEME} compile-r7rs -o test-program test.scm
+	./test-program
 
 test-docker: testfiles
-	cd .tmp && \
-		DOCKER_TAG=${DOCKER_TAG} \
-		SNOW_PACKAGES="srfi.64 ${PKG}" \
-		AKKU_PACKAGES=${AKKU_PACKAGES} \
-		APT_PACKAGES="libcurl4-openssl-dev" \
-		COMPILE_R7RS=${SCHEME} \
-		TEST_R7RS_DEBUG=1 \
-		CSC_OPIONS="-L -lcurl" \
-		test-r7rs -o test-program test.${SFX}
+	DOCKER_TAG=${DOCKER_TAG} \
+	SNOW_PACKAGES="srfi.64 ${PKG}" \
+	AKKU_PACKAGES=${AKKU_PACKAGES} \
+	APT_PACKAGES="libcurl4-openssl-dev" \
+	COMPILE_R7RS=${SCHEME} \
+	TEST_R7RS_DEBUG=1 \
+	CSC_OPIONS="-L -lcurl" \
+		test-r7rs -o test-program test.scm
+
+update-info:
+	curl -L -o srfi/${SRFI}/index.html https://srfi.schemers.org/srfi-${SRFI}/srfi-${SRFI}.html
+	printf "(foreign c) $$(cat srfi/${SRFI}/index.html | grep '<title>' | sed 's/<title>//' | sed 's/<\/title>//' | sed 's/^[ \t]*//' | tr -d '\n')" > srfi/${SRFI}/DESCRIPTION
+
+clean:
+	git clean -X -f

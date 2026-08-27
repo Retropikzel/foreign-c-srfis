@@ -1,5 +1,33 @@
-(test-begin "srfi-106")
+(import (scheme base)
+        (scheme write)
+        (scheme read)
+        (scheme char)
+        (scheme file)
+        (scheme process-context)
+        (retropikzel tap)
+        (foreign c)
+        (srfi 64)
+        (srfi 106))
 
+(test-runner-current (tap-runner))
+
+(test-begin "106")
+
+
+(test-begin "TCP Client")
+
+(test-begin "URL")
+(let ((sock (make-client-socket "tcpbin.com" "4242"))
+      (msg "Hello world!"))
+  (socket-send sock (string->utf8 msg))
+  (test-equal msg (utf8->string (socket-recv sock (string-length msg))))
+  (socket-close))
+(test-begin "URL")
+
+(test-end "TCP Client")
+
+
+#|
 (define sock1-port "3005")
 (define sock2-port "3006")
 
@@ -41,4 +69,6 @@
 (write (utf8->string (socket-recv client-sock1 3)))
 (newline)
 
-(test-end "srfi-106")
+|#
+
+(test-end "106")
