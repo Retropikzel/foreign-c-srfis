@@ -5,7 +5,8 @@
           (scheme write)
           (scheme file)
           (scheme process-context)
-          (foreign c))
+          (foreign c)
+          (srfi 19))
   (export ;posix-error?
           ;posix-error-name
           ;posix-error-message
@@ -19,23 +20,23 @@
           rename-file
           delete-directory
           set-file-owner
-          ;set-file-times
-          ;truncate-file
+          set-file-times
+          truncate-file
           file-info
           file-info?
-          ;file-info:device
-          ;file-info:inode
-          ;file-info:mode
-          ;file-info:nlinks
-          ;file-info:uid
-          ;file-info:gid
-          ;file-info:rdev
-          ;file-info:size
-          ;file-info:blksize
-          ;file-info:blocks
-          ;file-info:atime
-          ;file-info:mtime
-          ;file-info:ctime
+          file-info:device
+          file-info:inode
+          file-info:mode
+          file-info:nlinks
+          file-info:uid
+          file-info:gid
+          file-info:rdev
+          file-info:size
+          file-info:blksize
+          file-info:blocks
+          file-info:atime
+          file-info:mtime
+          file-info:ctime
           file-info-directory?
           ;file-info-fifo?
           ;file-info-symlink?
@@ -48,17 +49,17 @@
           open-directory
           read-directory
           close-directory
-          ;real-path
+          real-path
           ;file-space
           temp-file-prefix
           create-temp-file
           call-with-temporary-filename
-          ;umask
-          ;set-umask!
+          umask
+          set-umask!
           current-directory
           set-current-directory!
           pid
-          ;nice
+          nice
           user-uid
           user-gid
           user-effective-uid
@@ -72,13 +73,13 @@
           user-info:home-dir
           user-info:shell
           user-info:full-name
-          ;user-info:parsed-full-name
+          user-info:parsed-full-name
           group-info
           group-info?
           group-info:name
           group-info:gid
-          ;posix-time
-          ;monotonic-time
+          posix-time
+          monotonic-time
           set-environment-variable!
           delete-environment-variable!
           ;terminal?
