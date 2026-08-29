@@ -16,7 +16,7 @@ package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
 		--version="${VERSION}" \
 		--authors="$$(cat srfi/${SRFI}/AUTHORS 2>/dev/null || echo 'Retropikzel')" \
 		--doc=${DOCFILE} \
-		--test=${TESTFILE}
+		--test=${TESTFILE} \
 		--description="$$(cat srfi/${SRFI}/DESCRIPTION)" \
 		srfi/${SRFI}.sld
 
