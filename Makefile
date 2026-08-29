@@ -4,19 +4,24 @@ SCHEME=chibi
 SRFI=170
 PKG=srfi-${SRFI}-${VERSION}.tgz
 VERSION=$$(cat srfi/${SRFI}/VERSION)
+TESTFILE=srfi/${SRFI}/test.scm
+DOCFILE=srfi/${SRFI}/index.html
 
 all: package
 
 package: srfi/${SRFI}/LICENSE srfi/${SRFI}/VERSION
-	cp srfi/${SRFI}/index.html index.html
 	cp srfi/${SRFI}/test.scm test.scm
 	snow-chibi package \
 		--license="$$(cat srfi/${SRFI}/LICENSE)" \
 		--version="${VERSION}" \
 		--authors="$$(cat srfi/${SRFI}/AUTHORS 2>/dev/null || echo 'Retropikzel')" \
-		--doc=index.html \
+		--doc=${DOCFILE} \
+		--test=${TESTFILE}
 		--description="$$(cat srfi/${SRFI}/DESCRIPTION)" \
 		srfi/${SRFI}.sld
+
+git-index: package
+	snow-chibi git-index ${PKG}
 
 install:
 	snow-chibi install --impls=${SCHEME} --skip-tests?=1 ${PKG}
